@@ -29,14 +29,28 @@ namespace TheTurned.Monsters.Arthron
         private const string PdwTagName = "PDWItem_TagDef";
         private const string PdwTagGuid = "87b91929-c816-97d4-4877-20b00fdf37b3";
 
-        // Optional vanilla actives to prefer; fall back to custom passives if absent (no hard dependency).
-        private static readonly string[] AcidSpitCandidates =
-        {
-            "Siren_SpitAcid_AbilityDef", "SpawnAcidWorms_AbilityDef", "AcidSpit_AbilityDef"
-        };
+        // Optional vanilla/TFTV abilities to prefer; fall back to custom passives if absent (no hard dependency).
+
+        // ACID SPIT: deliberately left EMPTY -> always uses the custom passive fallback. The real acid
+        // abilities are all ShootAbilityDefs bound to a creature-specific weapon/bodypart, e.g.
+        // "Siren_SpitAcid_AbilityDef" (TFTVDefsWithConfigDependency.cs:1187, paired with
+        // "Siren_Torso_AcidSpitter_WeaponDef" :1185) and "GooSpit_ShootAbilityDef"
+        // (TFTVArtOfCrab.cs:833). VERDICT: NOT safe as a personal-track perk -- ShootAbility.Weapon is
+        // base.Equipment as Weapon (ShootAbility.cs:23) and the whole ability dereferences it
+        // (targeting/Shoot/GetWeaponDisabledState -> NoSuitableEquipment when Weapon==null,
+        // ShootAbility.cs:126). A recruited Arthron has no acid-spitter weapon, so the ability would be
+        // permanently disabled / null-deref. Keep the +BonusAttackDamage "Acid Glands" passive instead.
+        private static readonly string[] AcidSpitCandidates = new string[0];
+
+        // REGENERATION: verified self-contained passive. "Regeneration_Torso_Passive_AbilityDef" is an
+        // ApplyStatusAbilityDef (ApplyStatusAbilityDef : TacticalAbilityDef, ApplyStatusAbilityDef.cs:12)
+        // that applies the "Regeneration_Torso_Constant_StatusDef" HealthChangeStatusDef when added to a
+        // unit. TFTV grants it exactly this way -- AddAbility(regeneration, actor) with no weapon needed
+        // (TFTVHumanEnemies.cs:1719; def also runtime-present per VariousAdjustments.cs:101). VERDICT:
+        // safe to drop into a personal track. Null-guarded fallback (+Endurance) remains for non-TFTV.
         private static readonly string[] RegenerationCandidates =
         {
-            "Regeneration_AbilityDef", "Mist_Regeneration_AbilityDef", "Regenerate_AbilityDef"
+            "Regeneration_Torso_Passive_AbilityDef"
         };
 
         // --- stable invented GUIDs (idempotent across reloads) ----------------------------------
