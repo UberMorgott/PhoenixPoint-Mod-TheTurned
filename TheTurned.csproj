@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-7E8F-4A1B-9C2D-3E4F5A6B7C8D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>TheTurned</RootNamespace>
+    <AssemblyName>TheTurned</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <!-- ModSDK reference DLLs (mirror Officer-src; verified present). -->
+    <ModSDK>$(MSBuildProjectDirectory)\..\refs\Officer-src\ModSDK</ModSDK>
+    <!-- Build net472 with the .NET SDK (no VS targeting pack installed) by pointing at the
+         cached Microsoft.NETFramework.ReferenceAssemblies.net472 NuGet reference assemblies. -->
+    <NetFxRefAssemblies>$(NuGetPackageFolders)microsoft.netframework.referenceassemblies.net472\1.0.3\build\.NETFramework\v4.7.2</NetFxRefAssemblies>
+    <NetFxRefAssemblies Condition="!Exists('$(NetFxRefAssemblies)')">$(USERPROFILE)\.nuget\packages\microsoft.netframework.referenceassemblies.net472\1.0.3\build\.NETFramework\v4.7.2</NetFxRefAssemblies>
+    <FrameworkPathOverride>$(NetFxRefAssemblies)</FrameworkPathOverride>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>Dist\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>Dist\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(ModSDK)\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ModSDK)\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ModSDK)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <!-- Legacy UnityEngine.Input (GetKeyDown/GetKey) lives in InputLegacyModule, which is not
+         in Officer's ModSDK — reference it from the live game Managed folder. -->
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>D:\Steam\steamapps\common\Phoenix Point\PhoenixPointWin64_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ArthronClass.cs" />
+    <Compile Include="ArthronRecruiter.cs" />
+    <Compile Include="HumanClassificationPatch.cs" />
+    <Compile Include="RecruitHotkey.cs" />
+    <Compile Include="TheTurnedMain.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="meta.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

@@ -1,0 +1,15 @@
+# Build output
+bin/
+obj/
+Dist/
+# IDE / OS
+.serena/
+.vs/
+*.user
+*.suo
+Thumbs.db
+.DS_Store
+# Release packaging
+*.zip
+# Secrets
+.env

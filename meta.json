@@ -1,0 +1,24 @@
+{
+  "ID": "Morgott.TheTurned",
+  "AssemblyName": "TheTurned.dll",
+  "Author": [
+    {
+      "Key": "English",
+      "Value": "Morgott"
+    }
+  ],
+  "Version": "0.1.0",
+  "Name": [
+    {
+      "Key": "English",
+      "Value": "The Turned"
+    }
+  ],
+  "Description": [
+    {
+      "Key": "English",
+      "Value": "Recruit Pandoran Arthron into your roster (dev MVP)."
+    }
+  ],
+  "Dependencies": []
+}
