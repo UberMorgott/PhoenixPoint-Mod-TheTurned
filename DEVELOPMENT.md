@@ -8,15 +8,32 @@ Self-contained dev reference so this repo alone bootstraps a new session. The *f
 
 ## What the mod does
 
-Grants a copy of the game's enemy **Arthron** (internal codename *Crabman*) to the Phoenix faction at runtime, classified as a playable **soldier**. Triggered by **Ctrl+Shift+T** on the geoscape. Standalone (`Dependencies: []`), TFTV-safe. Target framework **.NET Framework 4.7.2**; mod ID `Morgott.TheTurned`, v0.1.0.
+Grants a copy of the game's enemy **Arthron** (internal codename *Crabman*) to the Phoenix faction at runtime, classified as a playable **soldier** with a balanced stat block and a real 7-slot Arthron perk tree. Triggered by **Ctrl+Shift+T** on the geoscape. Standalone (`Dependencies: []`), TFTV-safe. Target framework **.NET Framework 4.7.2**; mod ID `Morgott.TheTurned`, v0.2.0.
 
-## Architecture (5 source files)
+## Architecture (Phase 2: Core + per-monster)
 
-- **`TheTurnedMain.cs`** — `ModMain` subclass (one per assembly), mirrors OfficerMain lifecycle. `OnModEnabled` runs three things in order: (1) `ArthronClass.EnsureCreated()`, (2) `HumanClassificationPatch.Apply(HarmonyInstance)`, (3) attach `RecruitHotkey` to `ModGO`. `CanSafelyDisable => false` (runtime grants can't be cleanly reverted). Class creation and the patch MUST happen in `OnModEnabled` (mod/game load) — before any geoscape — so `FactionCharacterGenerator.Start()` caches our spec.
-- **`RecruitHotkey.cs`** — `MonoBehaviour` attached to `ModGO`; polls legacy `UnityEngine.Input` in `Update()`. Fires `ArthronRecruiter.RecruitOne()` on Ctrl+Shift+T. (PP is Unity 2019.4.x with the legacy input module active; `UnityEngine.InputLegacyModule.dll` is referenced from the live game Managed folder, not the Officer ModSDK.)
-- **`ArthronRecruiter.cs`** — the recruit chain. Geoscape guard → resolve a basic Arthron `TacCharacterDef` by the `Crabman_ClassTagDef` tag (prefer non-Elite/non-Ultra, deterministic by name) → clone it (`GetOrCreateProgressedArthron`) → `GenerateUnit` → `SpawnAsCharacter` → grant via `GeoFactionReward.Apply` into a Phoenix base site. Idempotent: the clone uses a fixed invented GUID, so repeat presses reuse it.
-- **`ArthronClass.cs`** — builds (idempotently) the dedicated class: a `ClassTagDef`, a marker `GameTagDef`, and a `SpecializationDef` cloned from the vanilla **Sniper** spec, carrying a 7-slot `AbilityTrackDef`. Slot 0 = a `ClassProficiencyAbilityDef` cloned from the Sniper proficiency (carries the new class tag); slots 1–6 = the Sniper track's own vanilla abilities (valid + localized placeholders). Registered into `SharedData.SharedGameTags.Specializations` so the generator discovers it. NOT granted to the faction, so it doesn't pollute normal soldier class-selection.
-- **`HumanClassificationPatch.cs`** — a Harmony **Postfix on `TacCharacterDef.CheckIsHuman`**, scoped to the marker tag: `__result = true` only when the def's `Data.GameTags` contains our marker. `IsHuman => CheckIsHuman()`, so one Postfix covers every read path.
+The original monolithic, Arthron-specific code was refactored into a **generic `Core`** layer plus **per-monster** definitions under `src\Monsters\`. The Core knows nothing Arthron-specific; each monster supplies its own data through one interface.
+
+### `src\Core\` (generic, monster-agnostic)
+
+- **`ITurnedMonster.cs`** — the contract every monster implements: `Id`, `RecruitKey`, `ResolveTemplate(repo)` (find the source enemy def), class/spec display metadata, `BuildAbilityTrack(repo, proficiency)` → 7 slots, `ApplyStatOverrides(clone)`, and the stable GUIDs (clone, class tag, spec, track, proficiency, plus the progression/VED GUIDs).
+- **`TurnedMonsterBase.cs`** — abstract base implementing the boilerplate of `ITurnedMonster`; monsters subclass it and override only what's monster-specific.
+- **`MonsterRegistry.cs`** — the explicit registry. `RegisterDefaults()` clears and registers each monster (currently one line: `Register(new ArthronMonster())`). Core iterates `MonsterRegistry.All` to build classes and map hotkeys.
+- **`DefUtils.cs`** — def-system helpers: `GetOrCreate`/`Clone` (idempotent `CreateDef` guards), `AppendDataGameTag`, `ResetClassTagsCache` (reflection null of `_classTags`), `BorrowHumanLevelProgression`, `RegisterSpecInSharedData` (Contains-guarded append into `SharedData.SharedGameTags.Specializations`), `ResolveByName<T>`, `AnyTemplate<T>`.
+- **`Tags.cs`** — the **one** shared marker `GameTag` `"TheTurned_RecruitTag"` used by every recruited monster for soldier classification.
+- **`TurnedClassFactory.cs`** — generic `EnsureClass`: clones the vanilla **Sniper** spec / proficiency / ViewElementDefs, builds the monster's ability track, and registers the spec.
+- **`TurnedRecruiter.cs`** — generic `RecruitMonster`: resolve template → clone + borrow LevelProgression → append the class tag + the shared marker → reset the class-tags cache → `ApplyStatOverrides` → `GenerateUnit` → `SpawnAsCharacter` → `GeoFactionReward` grant chain.
+- **`RecruitHotkey.cs`** — `MonoBehaviour` on `ModGO`; iterates the registry and fires the matching monster's recruit on **Ctrl+Shift+<key>** (legacy `UnityEngine.Input` poll; `UnityEngine.InputLegacyModule.dll` referenced from the live game Managed folder).
+- **`HumanClassificationPatch.cs`** — the shared Harmony **Postfix on `TacCharacterDef.CheckIsHuman`**, keyed on the **one** marker tag (`__result = true` only when the def's `Data.GameTags` contains it). `IsHuman => CheckIsHuman()`, so one Postfix covers all read paths for all monsters.
+- **`PerkFactory.cs`** — generic, dependency-free perk builder: `BuildStatPassive(...)` creates a self-contained `PassiveModifierAbilityDef`; `Add(target, value)` builds an `ItemStatModification`.
+- **`Icons.cs`** — sprite loader for perk PNGs under `Assets\Textures\` (graceful no-op if a PNG is absent — falls back to the Sniper icon).
+- **`Localization.cs`** — CSV loader for `Assets\Localization\TheTurned.csv`.
+- **`ModMain.cs`** — `TheTurnedMain : ModMain`. `OnModEnabled`: register monsters + build all classes + apply the `CheckIsHuman` patch once + attach the hotkey + load the loc CSV. `OnLevelEnd` re-applies the classes on the `"Home"` level for persistence. `CanSafelyDisable => false`. Class creation MUST happen in `OnModEnabled` (before any geoscape) so `FactionCharacterGenerator.Start()` caches the specs.
+
+### `src\Monsters\Arthron\` (Arthron-specific)
+
+- **`ArthronMonster.cs`** — `ITurnedMonster` impl (via `TurnedMonsterBase`): resolves a basic Crabman variant (filter by `Crabman_ClassTagDef`, prefer non-Elite/non-Ultra, ordinal name order), carries the preserved stable GUIDs, applies the stat overrides, and delegates the track to `ArthronPerks`.
+- **`ArthronPerks.cs`** — the 7-slot track + the per-perk builders and their numeric consts (see the perk table below).
 
 ## The grounded recipe (why it works)
 
@@ -38,26 +55,78 @@ Pandoran defs have a **null** `Data.LevelProgression`. TFTV's `GenerateUnit` pre
 ### Tactical safety `[G]`
 `find_referencing_symbols(CheckIsHuman)` shows all callers in the **Geoscape** namespace only; a pattern search over the entire `PhoenixPoint.Tactical` namespace for `CheckIsHuman`/`.IsHuman` returns **ZERO** hits. So the marker-scoped Postfix has no tactical-side effect.
 
+### Stat formula & rebalance `[G]`
+`ApplyStatOverrides(clone)` mutates **only** `clone.Data.Strength / .Will / .Speed` (per-def). MaxHP follows the shared game formula:
+
+```
+MaxHP = TacticalActorBaseDef.Toughness + Strength × EnduranceToHealthMultiplier(10)
+```
+
+- Arthron `Toughness = 120` (derived from observed Phase-1 raw values: Strength 100 → 1120 HP).
+- Chosen consts: **Strength 20, Will 18, Speed 12** (in `ArthronMonster.cs`). So base recruit MaxHP = `120 + 20×10 = 320` (down from 1120) — a "heavy bruiser but fair" tanky alien soldier, not god-tier.
+- Strength also governs carry weight / endurance; Will 18 = solid WP pool; Speed 12 = slightly below nimble humans (heavy unit).
+- **`Toughness` and `EnduranceToHealthMultiplier` are on the SHARED `TacticalActorBaseDef`** — mutating them would flip *all* enemy Arthrons, so they are NOT touched. The lever is the clone's per-def `Strength/Will/Speed` only.
+
+### Perk model `[G]`
+Each custom perk is a self-contained `PassiveModifierAbilityDef` built by `PerkFactory.BuildStatPassive`:
+
+- `PassiveModifierAbilityDef.StatModifications : ItemStatModification[]`; each `ItemStatModification` has `TargetStat` / `Modification` / `Value`.
+- `StatModificationTarget` members used (with their enum values): `Endurance = 0`, `Armour = 8`, `BonusAttackDamage = 0x200`; `StatModificationType.Add`.
+- `Endurance` raises MaxHP via the formula above (×10 per point): +5 Endurance = +50 MaxHP, etc.
+- Slot 0 = a `ClassProficiencyAbilityDef` whose `ClassTags : GameTagsList` is `Merge`d (idempotent) with `HandgunItem_TagDef` + `PDWItem_TagDef` so the Arthron may also wield a human sidearm.
+- Slots 2 & 5 first try a vanilla active by name (`ResolveByName`); only if unresolved do they fall back to a custom passive — so the track always has 7 non-null slots regardless of the loaded def DB.
+- `CreateDef` throws on a duplicate GUID, so every builder is wrapped in a get-or-create guard for idempotency across reloads/saves.
+
 ## Build & deploy
 
 ```powershell
 # build (uses the .NET SDK against net472 reference assemblies; no VS targeting pack needed)
+cd TheTurned
 $env:DOTNET_ROLL_FORWARD="LatestMajor"; dotnet build TheTurned.csproj -c Release
 ```
 
 - Output → `Dist\TheTurned.dll` (+ `.pdb`, + `meta.json` copied).
-- Deploy: copy `Dist\*` + `meta.json` + `Assets\` to `D:\Steam\steamapps\common\Phoenix Point\Mods\TheTurned\`.
+- Deploy: copy `Dist\*` + `meta.json` + `Assets\` to `D:\Steam\steamapps\common\Phoenix Point\Mods\TheTurned\` (PowerShell: `copy Dist\* <Mods>\TheTurned\`).
 - Build references the Officer ModSDK (`..\refs\Officer-src\ModSDK`: `0Harmony.dll`, `Assembly-CSharp.dll`, `UnityEngine.CoreModule.dll`) and `UnityEngine.InputLegacyModule.dll` from the live game Managed folder.
 
-## Known issues / Phase-2 TODO
+## Arthron perk table (consts in `ArthronPerks.cs`)
 
-- **Ability track placeholders:** slots 1–6 reuse vanilla Sniper abilities. Replace with real Arthron-themed perks.
-- **Icons + localization:** ViewElementDefs currently use literal `LocalizedTextBind(text, doNotLocalize:true)`. Move to a real loc CSV + custom icons under `Assets\Textures\`.
-- **Second unit:** the "jellyfish-head" (Siren-class) Pandoran, via the same recipe with the Siren class tag.
-- **Spawn conditions:** replace the debug hotkey with a real trigger (mission reward / capture-and-turn / research gate).
-- **Cosmetic equip UI (residual):** mutate/bionics/equip geoscape screens now treat the Arthron as human-eligible and render incompatible non-human bodyparts. No crash; needs a bodypart-slot guard or custom equip view later.
+| Slot | Name | Stat mods |
+| --- | --- | --- |
+| 0 | Arthron Instincts (proficiency) | + Handgun/PDW item tags on the class proficiency |
+| 1 | Natural Armour | Armour +10 |
+| 2 | Acid Glands / Acid Spit | vanilla acid active by name, else BonusAttackDamage +15 |
+| 3 | Chitin Plating | Armour +15, Endurance +5 (+50 MaxHP) |
+| 4 | Crushing Claw | BonusAttackDamage +20 |
+| 5 | Hardened Hide / Regeneration | vanilla regen active by name, else Endurance +8 (+80 MaxHP) |
+| 6 | Apex Carapace (capstone) | Armour +20, Endurance +10 (+100 MaxHP), BonusAttackDamage +10 |
+
+Progression costs scale 10→30 SkillPoints and 10→30 Mutagen toward the capstone. Fully leveled, the Endurance perks stack on the 320 base → roughly ~550 MaxHP plus heavy armour.
+
+## How to add a new monster (zero-boilerplate)
+
+The Core is monster-agnostic; adding a recruitable Pandoran needs **no Core changes** — a new folder plus one registry line.
+
+1. **Create** `src\Monsters\<Name>\<Name>Monster.cs` and subclass `TurnedMonsterBase`.
+2. **Pick stable, unique GUIDs** for the clone, class tag, spec, track, proficiency, the proficiency-progression, and the two ViewElementDef (VED) GUIDs. Invent fresh GUIDs — never reuse another monster's (a duplicate GUID makes `CreateDef` throw).
+3. **Implement the monster-specific overrides:**
+   - `Id`, `RecruitKey` (its `Ctrl+Shift+<key>`).
+   - `ResolveTemplate(repo)` — locate the source enemy `TacCharacterDef` (filter `GetAllDefs<TacCharacterDef>()` by the monster's class tag, prefer a basic variant, order by name for determinism).
+   - `ApplyStatOverrides(clone)` — set `clone.Data.Strength/Will/Speed` for the desired MaxHP (`Toughness + Strength×10`). Mutate the clone only, never the shared base def.
+   - `BuildAbilityTrack(repo, proficiency)` — return 7 `AbilityTrackSlot`s. Slot 0 = the supplied proficiency; slots 1–6 = `PerkFactory.BuildStatPassive(...)` perks (and/or vanilla actives via `DefUtils.ResolveByName`). Keep a custom-passive fallback so every slot is non-null.
+   - Display metadata + the loc keys (add rows to `Assets\Localization\TheTurned.csv`); optionally drop perk PNGs into `Assets\Textures\`.
+4. **Register it:** add one line to `MonsterRegistry.RegisterDefaults()` — `Register(new <Name>Monster());`.
+5. **Build & deploy.** Core builds the class, wires the hotkey, and the shared `CheckIsHuman` patch + the single `"TheTurned_RecruitTag"` marker handle soldier classification automatically.
+
+## Known issues / next steps
+
+- **Acid Spit & Regeneration fallback:** slots 2 & 5 may use the custom-passive fallback if the vanilla def names (`Siren_SpitAcid_AbilityDef`, `Regeneration_AbilityDef`, …) don't resolve in the live def DB. Confirm the real names from a live def-dump.
+- **Perk icons are placeholders:** the `Icons.cs` loader is wired but no per-perk art ships yet (Sniper icon shown as fallback).
+- **In-game verification pending:** the final Phase-2 build could not be live-tested from the build host (needs a game restart). Follow the README "In-game test steps".
+- **Cosmetic equip UI (residual):** mutate/bionics/equip geoscape screens treat the Arthron as human-eligible and render incompatible non-human bodyparts. No crash; needs a bodypart-slot guard or custom equip view later.
+- **Spawn conditions:** the recruit is still a debug hotkey; a real trigger (mission reward / capture-and-turn / research gate) is future scope.
 
 ## See also
 
-- Monorepo research note (full citations): `docs\research\theturned-arthron-recruit.md` — recruit chain (§2), hotkey (§3), null-`LevelProgression` fix (§6), soldier-classification trick (§7), gotchas + Phase-2 (§8).
+- Monorepo research note (full citations): `docs\research\theturned-arthron-recruit.md` — recruit chain (§2), hotkey (§3), null-`LevelProgression` fix (§6), soldier-classification trick (§7), gotchas (§8), and **Phase 2 — refactor + perks + rebalance (§9)**.
 - Design spec: `docs\superpowers\specs\2026-06-09-theturned-arthron-recruit-design.md`.

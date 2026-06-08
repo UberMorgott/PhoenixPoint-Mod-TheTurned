@@ -7,7 +7,7 @@
       "Value": "Morgott"
     }
   ],
-  "Version": "0.1.0",
+  "Version": "0.2.0",
   "Name": [
     {
       "Key": "English",
@@ -17,7 +17,7 @@
   "Description": [
     {
       "Key": "English",
-      "Value": "Recruit Pandoran Arthron into your roster (dev MVP)."
+      "Value": "Modular framework to recruit turned Pandorans as Phoenix soldiers; adds the Arthron class."
     }
   ],
   "Dependencies": []

@@ -50,6 +50,11 @@
       <HintPath>$(ModSDK)\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <!-- ImageConversion.LoadImage (icon loader) lives in the ImageConversionModule. -->
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(ModSDK)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <!-- Legacy UnityEngine.Input (GetKeyDown/GetKey) lives in InputLegacyModule, which is not
          in Officer's ModSDK — reference it from the live game Managed folder. -->
     <Reference Include="UnityEngine.InputLegacyModule">
@@ -60,17 +65,18 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ArthronClass.cs" />
-    <Compile Include="ArthronRecruiter.cs" />
-    <Compile Include="HumanClassificationPatch.cs" />
-    <Compile Include="RecruitHotkey.cs" />
-    <Compile Include="TheTurnedMain.cs" />
+    <!-- Core + per-monster architecture under src/ (recursive). -->
+    <Compile Include="src\**\*.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="meta.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Ship the whole Assets tree (localization CSV + perk/class icons) to Dist\Assets\... -->
+    <Content Include="Assets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
