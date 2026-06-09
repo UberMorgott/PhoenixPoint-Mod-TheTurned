@@ -9,8 +9,9 @@ namespace TheTurned.Core
 {
     /// <summary>OR our marker into `_hasPandoranProgression` at its single assignment in
     /// UIModuleCharacterProgression.SetCharacterProgression. Routes Phase-4 recruits into the
-    /// mutoid choose-on-levelup UI. Fallback if transpiler breaks on a game patch (documented,
-    /// not shipped): Postfix set the field + re-invoke private SetAbilityTracks().</summary>
+    /// mutoid choose-on-levelup UI. Fallback if the transpiler breaks on a game patch (documented,
+    /// not shipped): Postfix on SetCharacterProgression: set _hasPandoranProgression via
+    /// reflection, then reflection-invoke private SetAbilityTracks().</summary>
     internal static class PandoranProgressionGate
     {
         private static bool _applied;
@@ -24,14 +25,26 @@ namespace TheTurned.Core
             if (_applied || harmony == null || !Phase4.Enabled) return;
             var target = AccessTools.Method(typeof(UIModuleCharacterProgression),
                 nameof(UIModuleCharacterProgression.SetCharacterProgression));
-            harmony.Patch(target, transpiler: new HarmonyMethod(typeof(PandoranProgressionGate), nameof(Transpiler)));
-            _applied = true;
-            TheTurnedMain.LogInfo("[TheTurned] Pandoran progression gate transpiler applied.");
+            if (target == null || CharacterField == null || GateField == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] Pandoran progression gate: target method or fields not resolved — gate disabled.");
+                return;
+            }
+            try
+            {
+                harmony.Patch(target, transpiler: new HarmonyMethod(typeof(PandoranProgressionGate), nameof(Transpiler)));
+                _applied = true;
+                TheTurnedMain.LogInfo("[TheTurned] Pandoran progression gate transpiler applied.");
+            }
+            catch (System.Exception e)
+            {
+                TheTurnedMain.Main?.Logger?.LogError($"[TheTurned] Pandoran progression gate patch failed: {e}");
+            }
         }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-            bool injected = false;
+            int injected = 0;
             foreach (var ci in instructions)
             {
                 // Stack discipline: before `stfld` the stack is [this, value]; pushing `ldarg.0`
@@ -39,17 +52,19 @@ namespace TheTurned.Core
                 // (value, this) in declaration order (this = top of stack), pushes the OR'd bool
                 // -> [this, bool'] -> `stfld` consumes. OrGate must be public static (call target
                 // from the patched method).
-                if (!injected && ci.opcode == OpCodes.Stfld && Equals(ci.operand, GateField))
+                if (ci.opcode == OpCodes.Stfld && Equals(ci.operand, GateField))
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call,
                         AccessTools.Method(typeof(PandoranProgressionGate), nameof(OrGate)));
-                    injected = true;
+                    injected++;
                 }
                 yield return ci;
             }
-            if (!injected)
-                TheTurnedMain.LogWarn("[TheTurned] gate transpiler: stfld _hasPandoranProgression NOT found — gate inactive (see fallback note).");
+            if (injected == 0)
+                TheTurnedMain.LogWarn("[TheTurned] Pandoran progression gate: target stfld not found — gate disabled (see PandoranProgressionGate class doc for the Postfix fallback)");
+            else if (injected > 1)
+                TheTurnedMain.LogWarn($"[TheTurned] Pandoran progression gate: {injected} assignments of _hasPandoranProgression patched — game code drifted from single-assignment shape.");
         }
 
         public static bool OrGate(bool original, UIModuleCharacterProgression module)
