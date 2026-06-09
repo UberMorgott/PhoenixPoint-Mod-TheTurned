@@ -81,6 +81,8 @@ namespace TheTurned
                 if (geo != null)
                 {
                     ArmFollowHook.ScanAndSubscribe(geo);
+                    // Phase-4: feed the popup spec ROWS into the faction list (no-op when TFTV absent).
+                    SpecRowFactory.FeedRows(geo);
                     Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
                 }
             }
@@ -110,10 +112,12 @@ namespace TheTurned
                     monster.BuildArmOptions(repo);
                 }
             }
-            // Phase 4: enumerate + pair Crabman matched bodypart/hand SETs (idempotent, logs once).
+            // Phase 4: enumerate + pair Crabman matched bodypart/hand SETs (idempotent, logs once),
+            // then build the popup spec ROWS (Bruiser + Gunner reuse rows).
             if (Phase4.Enabled)
             {
                 CrabmanParts.Build(repo);
+                Monsters.Arthron.ArthronMonster.BuildPhase4Rows(repo);
             }
         }
     }

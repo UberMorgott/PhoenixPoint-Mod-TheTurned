@@ -164,6 +164,34 @@ namespace TheTurned.Core
             return prog;
         }
 
+        /// <summary>
+        /// Build (idempotently) a VED for a Phase-4 popup ROW (SpecializationDef.ViewElementDef): same
+        /// clone+loc flow as <see cref="BuildVed"/> but with the SPEC icon slot (Icons.TrySetSpecIcon).
+        /// </summary>
+        internal static TacticalAbilityViewElementDef BuildRowVed(
+            DefRepository repo, string vedGuid, string vedName, string nameLocKey, string descLocKey, string iconFileName)
+        {
+            if (repo.GetDef(vedGuid) is TacticalAbilityViewElementDef existing)
+            {
+                return existing;
+            }
+            TacticalAbilityViewElementDef template =
+                (repo.GetDef(SniperProficiencyGuid) as ClassProficiencyAbilityDef)?.ViewElementDef;
+            TacticalAbilityViewElementDef ved = template != null
+                ? repo.CreateDef<TacticalAbilityViewElementDef>(vedGuid, template)
+                : repo.CreateDef<TacticalAbilityViewElementDef>(vedGuid);
+            if (ved == null)
+            {
+                return null;
+            }
+            ved.name = "E_ViewElement [" + vedName + "]";
+            ved.Name = vedName;
+            ved.DisplayName1 = new LocalizedTextBind(nameLocKey);
+            ved.Description = new LocalizedTextBind(descLocKey);
+            Icons.TrySetSpecIcon(ved, iconFileName);
+            return ved;
+        }
+
         private static TacticalAbilityViewElementDef BuildVed(
             DefRepository repo, string vedGuid, string abilityName, string nameLocKey, string descLocKey, string iconFileName)
         {

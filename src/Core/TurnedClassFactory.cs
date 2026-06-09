@@ -26,7 +26,8 @@ namespace TheTurned.Core
     internal static class TurnedClassFactory
     {
         // Vanilla base-game GUIDs shared by all monsters (same defs the OfficerClass mod relies on).
-        private const string SniperSpecGuid = "8b8510fe-f1cb-53b4-3a85-3a306c94e31f";        // SniperSpecializationDef
+        // Internal: SpecRowFactory clones its Phase-4 popup rows from the same Sniper spec.
+        internal const string SniperSpecGuid = "8b8510fe-f1cb-53b4-3a85-3a306c94e31f";       // SniperSpecializationDef
         private const string SniperProficiencyGuid = "54328f21-e01a-4364-0aa7-4507affd2ccf"; // Sniper_ClassProficiency_AbilityDef
 
         private static ModLogger Log => TheTurnedMain.Main?.Logger;
@@ -266,6 +267,12 @@ namespace TheTurned.Core
 
             ClassProficiencyAbilityDef proficiency = GetOrCreateProficiency(repo, monster);
             track.AbilitiesByLevel = monster.BuildAbilityTrack(repo, proficiency);
+            // Phase-4 popup quirk: the personal track gets a hardcoded RemoveAt(3) then is read
+            // [0..maxLevel) — reshape to maxLevel+1 slots with index 3 an empty spacer.
+            if (Phase4.Enabled)
+            {
+                track.AbilitiesByLevel = SpecRowFactory.ReshapeWithSpacer(track.AbilitiesByLevel, totalLength: 8, spacerIndex: 3);
+            }
             return track;
         }
 

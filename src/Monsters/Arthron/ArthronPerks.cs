@@ -109,6 +109,23 @@ namespace TheTurned.Monsters.Arthron
             return slots;
         }
 
+        /// <summary>
+        /// Phase-4 popup ROW A "Bruiser" cells: the existing bruiser perks WITHOUT the slot-0 proficiency
+        /// (rows are pure perk lists). 5 design cells; SpecRowFactory pads to RowLength with fillers.
+        /// Builders are get-or-create, so double building with the fixed track is safe.
+        /// </summary>
+        internal static AbilityTrackSlot[] BuildRowCells(DefRepository repo)
+        {
+            return new[]
+            {
+                Slot(NaturalArmour(repo)),
+                Slot(ChitinPlating(repo)),
+                Slot(Regeneration(repo)),   // "Hardened Hide" fallback passive (or vanilla regen)
+                Slot(CrushingClaw(repo)),
+                Slot(ApexCarapace(repo))
+            };
+        }
+
         private static AbilityTrackSlot Slot(TacticalAbilityDef ability)
         {
             return new AbilityTrackSlot { Ability = ability, RequiresPrevAbility = false };

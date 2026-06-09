@@ -85,6 +85,24 @@ namespace TheTurned.Monsters.Arthron
             return slots;
         }
 
+        /// <summary>
+        /// Phase-4 popup ROW B "Gunner" cells: the existing gunner perks WITHOUT the slot-0 proficiency
+        /// (rows are pure perk lists). 6 design cells; SpecRowFactory pads to RowLength with fillers.
+        /// Builders are get-or-create, so double building with the fixed track is safe.
+        /// </summary>
+        internal static AbilityTrackSlot[] BuildRowCells(DefRepository repo)
+        {
+            return new[]
+            {
+                Slot(SteadyAim(repo)),
+                Slot(SuppressPlates(repo)),
+                Slot(LongBarrel(repo)),
+                Slot(ReturnFire(repo)),
+                Slot(SpotterEyes(repo)),
+                Slot(OverwatchCarapace(repo))
+            };
+        }
+
         private static AbilityTrackSlot Slot(TacticalAbilityDef ability)
         {
             return new AbilityTrackSlot { Ability = ability, RequiresPrevAbility = false };

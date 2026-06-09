@@ -122,6 +122,21 @@ namespace TheTurned.Monsters.Arthron
             ArthronArms.BuildOptions(repo);
         }
 
+        /// <summary>
+        /// Phase-4: register the Arthron's popup ROWS (reuse rows first — Bruiser + Gunner from the
+        /// existing Phase-2/3 perk builders). Idempotent; called from ModMain.BuildAllClasses when
+        /// Phase4.Enabled.
+        /// </summary>
+        internal static void BuildPhase4Rows(DefRepository repo)
+        {
+            // ROW A — Bruiser: 5 design cells, padded to RowLength by the factory.
+            SpecRowFactory.GetOrCreateRow(repo, "Bruiser", "ARTHRON_ROW_BRUISER_NAME", "Arthron_Spec.png",
+                ArthronPerks.BuildRowCells(repo));
+            // ROW B — Gunner: 6 design cells, padded to RowLength by the factory.
+            SpecRowFactory.GetOrCreateRow(repo, "Gunner", "ARTHRON_ROW_GUNNER_NAME", "ArthronGunner_Spec.png",
+                ArthronGunnerPerks.BuildRowCells(repo));
+        }
+
         private static bool HasCrabmanTag(TacCharacterDef def)
         {
             IEnumerable<ClassTagDef> tags = def.ClassTags;
