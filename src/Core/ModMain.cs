@@ -108,6 +108,8 @@ namespace TheTurned
                     monster.BuildArmOptions(repo);
                 }
             }
+            // Phase 4: enumerate + pair Crabman matched bodypart/hand SETs (idempotent, logs once).
+            CrabmanParts.Build(repo);
         }
     }
 }
