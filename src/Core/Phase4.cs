@@ -12,6 +12,10 @@ namespace TheTurned.Core
     {
         internal const string TftvModId = "phoenixrising.tftv";
 
+        /// <summary>DEV: every Phase-4 recruit progression cell clickable/buyable at level 1
+        /// (see <see cref="DevUnlockPatch"/>). Flip false for release.</summary>
+        internal const bool DevUnlockAllLevels = true;
+
         /// <summary>True only when TFTV resolved as dependency. All Phase-4 features gate on this.</summary>
         internal static bool Enabled { get; private set; }
 
