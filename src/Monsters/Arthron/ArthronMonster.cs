@@ -140,9 +140,18 @@ namespace TheTurned.Monsters.Arthron
             SpecRowFactory.GetOrCreateRow(repo, "Gunner", "ARTHRON_ROW_GUNNER", "ArthronGunner_Spec.png",
                 classTag, ArthronGunnerPerks.BuildRowCells(repo), fillerIcon: "ArthronGunner_Spec.png");
             // ROW C — Arms: matched-SET marker cells (CrabmanParts.Build runs first — ModMain order).
-            // Unresolved sets skip their cell; PadRow fills the holes.
-            SpecRowFactory.GetOrCreateRow(repo, "Arms", "ARTHRON_ROW_ARMS", "Arthron_ArmRight.png",
-                classTag, ArthronArmsRow.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+            // GATED on resolved sets: building early would bake 8 fillers into the track def PERMANENTLY
+            // (GetOrCreateRowTrack early-returns the existing def and never refreshes). Deferred rows
+            // appear on the first successful pass + the next FeedRows.
+            if (CrabmanParts.HasSets)
+            {
+                SpecRowFactory.GetOrCreateRow(repo, "Arms", "ARTHRON_ROW_ARMS", "Arthron_ArmRight.png",
+                    classTag, ArthronArmsRow.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+            }
+            else
+            {
+                TheTurnedMain.LogWarn("[TheTurned] arms row deferred — Crabman sets not resolved yet");
+            }
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)

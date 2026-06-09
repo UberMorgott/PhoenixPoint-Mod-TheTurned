@@ -52,14 +52,14 @@ namespace TheTurned.Monsters.Arthron
                 Phase4.DeriveGuid("armset:" + key + "|ved").ToString(),
                 baseLocKey + "_NAME", baseLocKey + "_DESC", icon,
                 skillPointCost: mutagenCost, mutagenCost: mutagenCost,
-                extraStats ?? new ItemStatModification[0]);
+                extraStats);
             if (marker == null)
             {
                 TheTurnedMain.LogWarn($"[TheTurned] arms row: marker build failed for '{key}' — cell skipped");
                 return;
             }
-            // Register even when BuildStatPassive hit its get-or-create EXISTING path: the def may
-            // pre-exist while the in-memory registry is empty (fresh session).
+            // Register AFTER BuildStatPassive on purpose: same-session BuildAllClasses re-runs hit its
+            // get-or-create EXISTING path, and the registry upsert must still run on every pass.
             Phase4Markers.RegisterArmSet(marker, set);
             cells.Add(new AbilityTrackSlot { Ability = marker, RequiresPrevAbility = false });
         }
@@ -70,6 +70,8 @@ namespace TheTurned.Monsters.Arthron
         private static MatchedSet FindLeft(string token, string exclude = null)
             => Find(CrabmanParts.LeftArmSets, token, exclude);
 
+        // Substring match against runtime-discovered variant tokens (vocabulary visible in the
+        // CrabmanParts log dump); exclude is a pipe-separated OR-list of forbidden substrings.
         private static MatchedSet Find(IEnumerable<MatchedSet> sets, string token, string exclude)
             => sets.FirstOrDefault(s => s.Token.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0
                 && (exclude == null || !exclude.Split('|').Any(x => s.Token.IndexOf(x, StringComparison.OrdinalIgnoreCase) >= 0)));
