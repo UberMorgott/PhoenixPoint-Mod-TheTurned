@@ -267,11 +267,12 @@ namespace TheTurned.Core
 
             ClassProficiencyAbilityDef proficiency = GetOrCreateProficiency(repo, monster);
             track.AbilitiesByLevel = monster.BuildAbilityTrack(repo, proficiency);
-            // Phase-4 popup quirk: the personal track gets a hardcoded RemoveAt(3) then is read
-            // [0..maxLevel) — reshape to maxLevel+1 slots with index 3 an empty spacer.
+            // Phase-4 popup quirk: the personal track gets a hardcoded RemoveAt(SpacerIndex) then is
+            // read [0..maxLevel) — reshape to maxLevel+1 slots with an empty spacer at that index.
             if (Phase4.Enabled)
             {
-                track.AbilitiesByLevel = SpecRowFactory.ReshapeWithSpacer(track.AbilitiesByLevel, totalLength: 8, spacerIndex: 3);
+                track.AbilitiesByLevel = SpecRowFactory.ReshapeWithSpacer(track.AbilitiesByLevel,
+                    totalLength: SpecRowFactory.RowLength + 1, spacerIndex: SpecRowFactory.SpacerIndex);
             }
             return track;
         }

@@ -171,6 +171,24 @@ namespace TheTurned.Core
         internal static TacticalAbilityViewElementDef BuildRowVed(
             DefRepository repo, string vedGuid, string vedName, string nameLocKey, string descLocKey, string iconFileName)
         {
+            return BuildVedCore(repo, vedGuid, vedName, nameLocKey, descLocKey, iconFileName, specIconSlot: true);
+        }
+
+        private static TacticalAbilityViewElementDef BuildVed(
+            DefRepository repo, string vedGuid, string abilityName, string nameLocKey, string descLocKey, string iconFileName)
+        {
+            return BuildVedCore(repo, vedGuid, abilityName, nameLocKey, descLocKey, iconFileName, specIconSlot: false);
+        }
+
+        /// <summary>
+        /// Shared VED builder: idempotent clone of the Sniper proficiency VED (known-good template, same
+        /// approach the class uses) + loc keys + icon. <paramref name="specIconSlot"/> selects
+        /// Icons.TrySetSpecIcon (popup row) vs Icons.TrySetAbilityIcon (perk).
+        /// </summary>
+        private static TacticalAbilityViewElementDef BuildVedCore(
+            DefRepository repo, string vedGuid, string vedName, string nameLocKey, string descLocKey,
+            string iconFileName, bool specIconSlot)
+        {
             if (repo.GetDef(vedGuid) is TacticalAbilityViewElementDef existing)
             {
                 return existing;
@@ -188,32 +206,14 @@ namespace TheTurned.Core
             ved.Name = vedName;
             ved.DisplayName1 = new LocalizedTextBind(nameLocKey);
             ved.Description = new LocalizedTextBind(descLocKey);
-            Icons.TrySetSpecIcon(ved, iconFileName);
-            return ved;
-        }
-
-        private static TacticalAbilityViewElementDef BuildVed(
-            DefRepository repo, string vedGuid, string abilityName, string nameLocKey, string descLocKey, string iconFileName)
-        {
-            if (repo.GetDef(vedGuid) is TacticalAbilityViewElementDef existing)
+            if (specIconSlot)
             {
-                return existing;
+                Icons.TrySetSpecIcon(ved, iconFileName);
             }
-            // Use the Sniper proficiency VED as a known-good template (same approach the class uses).
-            TacticalAbilityViewElementDef template =
-                (repo.GetDef(SniperProficiencyGuid) as ClassProficiencyAbilityDef)?.ViewElementDef;
-            TacticalAbilityViewElementDef ved = template != null
-                ? repo.CreateDef<TacticalAbilityViewElementDef>(vedGuid, template)
-                : repo.CreateDef<TacticalAbilityViewElementDef>(vedGuid);
-            if (ved == null)
+            else
             {
-                return null;
+                Icons.TrySetAbilityIcon(ved, iconFileName);
             }
-            ved.name = "E_ViewElement [" + abilityName + "]";
-            ved.Name = abilityName;
-            ved.DisplayName1 = new LocalizedTextBind(nameLocKey);
-            ved.Description = new LocalizedTextBind(descLocKey);
-            Icons.TrySetAbilityIcon(ved, iconFileName);
             return ved;
         }
     }

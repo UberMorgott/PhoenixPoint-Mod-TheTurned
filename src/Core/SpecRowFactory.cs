@@ -20,7 +20,8 @@ namespace TheTurned.Core
     ///    (cost reads ability.CharacterProgressionData.MutagenCost; null prog data LogErrors) — shortfall
     ///    is padded with cheap unique filler passives (<see cref="PadRow"/>);
     ///  - the character's PERSONAL track gets a hardcoded RemoveAt(3) then is read [0..maxLevel) →
-    ///    the personal track must be maxLevel+1 slots with index 3 a spacer (<see cref="ReshapeWithSpacer"/>);
+    ///    the personal track must be maxLevel+1 slots with index <see cref="SpacerIndex"/> a spacer
+    ///    (<see cref="ReshapeWithSpacer"/>);
     ///  - rows must NOT use VehicleClassTag (popup SingleOrDefault-filters it) and set
     ///    IsUsedForProficiency=false (no ClassProficiencyAbilityDef → suppress the engine warn).
     /// </summary>
@@ -29,7 +30,11 @@ namespace TheTurned.Core
         /// <summary>Expected MaxLevel of the borrowed human LevelProgressionDef (verified via log at feed time).</summary>
         internal const int RowLength = 7;
 
+        /// <summary>Index the popup's hardcoded personal-track RemoveAt(3) eats (Init:124).</summary>
+        internal const int SpacerIndex = 3;
+
         private static readonly List<SpecializationDef> _rows = new List<SpecializationDef>();
+        private static bool _sniperSpecErrorLogged;
 
         /// <summary>All rows built so far (fed into the faction list by <see cref="FeedRows"/>).</summary>
         internal static IReadOnlyList<SpecializationDef> Rows => _rows;
@@ -37,10 +42,16 @@ namespace TheTurned.Core
         /// <summary>
         /// Idempotently build one popup row: a Sniper-cloned <see cref="SpecializationDef"/> with NO
         /// proficiency (pure perk list) and a <paramref name="cells"/>-driven track padded to
-        /// <see cref="RowLength"/> non-null abilities.
+        /// <see cref="RowLength"/> non-null abilities. <paramref name="baseLocKey"/> derives the
+        /// name/description keys (+"_NAME" / +"_DESC"). <paramref name="classTag"/> is the owning
+        /// monster's class tag — NEVER VehicleClassTag (the popup filters it with SingleOrDefault,
+        /// two would throw).
         /// </summary>
         internal static SpecializationDef GetOrCreateRow(DefRepository repo, string rowKey,
-            string nameLocKey, string iconFile, AbilityTrackSlot[] cells)
+            string baseLocKey, string iconFile, ClassTagDef classTag, AbilityTrackSlot[] cells,
+            string fillerIcon,
+            string fillerNameLocKey = "ARTHRON_ROW_FILLER_NAME",
+            string fillerDescLocKey = "ARTHRON_ROW_FILLER_DESC")
         {
             if (repo == null || string.IsNullOrEmpty(rowKey))
             {
@@ -49,7 +60,8 @@ namespace TheTurned.Core
             string specGuid = Phase4.DeriveGuid("row:" + rowKey).ToString();
             if (repo.GetDef(specGuid) is SpecializationDef existing)
             {
-                if (!_rows.Contains(existing))
+                // Same popup-NRE guard as below: never register a row with a missing track/VED.
+                if (existing.AbilityTrack != null && existing.ViewElementDef != null && !_rows.Contains(existing))
                 {
                     _rows.Add(existing);
                 }
@@ -59,7 +71,12 @@ namespace TheTurned.Core
             SpecializationDef sniperSpec = repo.GetDef(TurnedClassFactory.SniperSpecGuid) as SpecializationDef;
             if (sniperSpec == null)
             {
-                TheTurnedMain.LogWarn($"[TheTurned] Sniper spec not found — cannot clone row '{rowKey}'.");
+                if (!_sniperSpecErrorLogged)
+                {
+                    _sniperSpecErrorLogged = true;
+                    TheTurnedMain.Main?.Logger?.LogError(
+                        $"[TheTurned] Sniper spec '{TurnedClassFactory.SniperSpecGuid}' not found — cannot clone popup rows (first miss: '{rowKey}').");
+                }
                 return null;
             }
             SpecializationDef spec = repo.CreateDef<SpecializationDef>(specGuid, sniperSpec);
@@ -74,26 +91,36 @@ namespace TheTurned.Core
             // Rows carry no ClassProficiencyAbilityDef — suppress GetSpecProficiency's engine warn.
             spec.IsUsedForProficiency = false;
             spec.NotSecondClassSpecialization = true;
-            // NEVER VehicleClassTag (the popup filters it with SingleOrDefault — two would throw).
-            spec.ClassTag = ResolveArthronClassTag(repo);
+            spec.ClassTag = classTag;
             if (spec.ClassTag == null)
             {
-                TheTurnedMain.LogWarn($"[TheTurned] Arthron class tag unresolved for row '{rowKey}' — row keeps null ClassTag.");
+                TheTurnedMain.LogWarn($"[TheTurned] Null class tag passed for row '{rowKey}' — row keeps null ClassTag.");
             }
             if (spec.ClassFilterText != null)
             {
-                spec.ClassFilterText.LocalizationKey = nameLocKey;
+                spec.ClassFilterText.LocalizationKey = baseLocKey + "_NAME";
             }
-            spec.AbilityTrack = GetOrCreateRowTrack(repo, rowKey, cells);
-            spec.ViewElementDef = PerkFactory.BuildRowVed(repo,
+
+            AbilityTrackDef track = GetOrCreateRowTrack(repo, rowKey, cells, fillerIcon, fillerNameLocKey, fillerDescLocKey);
+            var ved = PerkFactory.BuildRowVed(repo,
                 Phase4.DeriveGuid("rowved:" + rowKey).ToString(),
-                spec.name + "_Ved", nameLocKey, nameLocKey + "_DESC", iconFile);
+                spec.name + "_Ved", baseLocKey + "_NAME", baseLocKey + "_DESC", iconFile);
+            if (track == null || ved == null)
+            {
+                // Popup NRE guard: a row without a track or VED would null-deref in Init — don't register it.
+                TheTurnedMain.Main?.Logger?.LogError(
+                    $"[TheTurned] Row '{rowKey}' track/VED build failed (track={(track == null ? "null" : "ok")}, ved={(ved == null ? "null" : "ok")}) — row NOT registered.");
+                return null;
+            }
+            spec.AbilityTrack = track;
+            spec.ViewElementDef = ved;
 
             _rows.Add(spec);
             return spec;
         }
 
-        private static AbilityTrackDef GetOrCreateRowTrack(DefRepository repo, string rowKey, AbilityTrackSlot[] cells)
+        private static AbilityTrackDef GetOrCreateRowTrack(DefRepository repo, string rowKey,
+            AbilityTrackSlot[] cells, string fillerIcon, string fillerNameLocKey, string fillerDescLocKey)
         {
             string trackGuid = Phase4.DeriveGuid("rowtrack:" + rowKey).ToString();
             if (repo.GetDef(trackGuid) is AbilityTrackDef existing)
@@ -107,7 +134,7 @@ namespace TheTurned.Core
             }
             track.name = $"TheTurned_ArthronRow_{rowKey}_AbilityTrackDef";
             track.ResourcePath = "Defs/Common/TacUnitClasses/AbilityTrackDef/" + track.name;
-            track.AbilitiesByLevel = PadRow(repo, rowKey, cells, RowLength);
+            track.AbilitiesByLevel = PadRow(repo, rowKey, cells, RowLength, fillerIcon, fillerNameLocKey, fillerDescLocKey);
             return track;
         }
 
@@ -116,7 +143,8 @@ namespace TheTurned.Core
         /// [0..maxLevel) and dereferences each ability's progression data). Design cells are kept; any
         /// shortfall / null cell becomes a unique cheap filler passive (+2 Willpower, cost 10/10).
         /// </summary>
-        internal static AbilityTrackSlot[] PadRow(DefRepository repo, string rowKey, AbilityTrackSlot[] cells, int length)
+        internal static AbilityTrackSlot[] PadRow(DefRepository repo, string rowKey, AbilityTrackSlot[] cells,
+            int length, string fillerIcon, string fillerNameLocKey, string fillerDescLocKey)
         {
             AbilityTrackSlot[] result = new AbilityTrackSlot[length];
             int cellCount = cells != null ? cells.Length : 0;
@@ -133,7 +161,7 @@ namespace TheTurned.Core
                     $"TheTurned_ArthronRow_{rowKey}_Filler{i}_AbilityDef",
                     Phase4.DeriveGuid(seed + "|prog").ToString(),
                     Phase4.DeriveGuid(seed + "|ved").ToString(),
-                    "ARTHRON_ROW_FILLER_NAME", "ARTHRON_ROW_FILLER_DESC", "Arthron_Spec.png",
+                    fillerNameLocKey, fillerDescLocKey, fillerIcon,
                     skillPointCost: 10, mutagenCost: 10,
                     new[] { PerkFactory.Add(StatModificationTarget.Willpower, 2f) });
                 result[i] = new AbilityTrackSlot { Ability = filler, RequiresPrevAbility = false };
@@ -144,7 +172,9 @@ namespace TheTurned.Core
         /// <summary>
         /// Personal-track reshape for the popup quirk: copy <paramref name="source"/> into
         /// <paramref name="totalLength"/> slots leaving <paramref name="spacerIndex"/> an empty slot
-        /// (the popup's hardcoded RemoveAt(3) eats it). Idempotent: already-long-enough arrays pass through.
+        /// (the popup's hardcoded RemoveAt(3) eats it). Idempotent: already-long-enough arrays pass
+        /// through. NOTE: the pass-through assumes such a source was already spacered; a NATURAL 8-slot
+        /// source would lose its index-3 slot to the popup's RemoveAt(3).
         /// </summary>
         internal static AbilityTrackSlot[] ReshapeWithSpacer(AbilityTrackSlot[] source, int totalLength, int spacerIndex)
         {
@@ -172,7 +202,7 @@ namespace TheTurned.Core
 
         /// <summary>
         /// Feed all built rows into <c>GeoPhoenixFaction.AvailablePandoranSpecialzations</c>.
-        /// Idempotent (Contains-guarded). Also logs a marked recruit's MaxLevel (RowLength sanity check).
+        /// Idempotent (Contains-guarded); silent when nothing new was added (no log, no recruit scan).
         /// </summary>
         internal static void FeedRows(GeoLevelController geo)
         {
@@ -181,40 +211,43 @@ namespace TheTurned.Core
                 return;
             }
             List<SpecializationDef> list = geo.PhoenixFaction.AvailablePandoranSpecialzations;
+            int added = 0;
             foreach (SpecializationDef row in _rows)
             {
                 if (!list.Contains(row))
                 {
                     list.Add(row);
+                    added++;
                 }
             }
-            TheTurnedMain.LogInfo($"[TheTurned] FeedRows: {_rows.Count} rows fed, pandoran specs now {list.Count}. "
-                + DescribeRecruitMaxLevel(geo));
+            if (added == 0)
+            {
+                return;
+            }
+            TheTurnedMain.LogInfo($"[TheTurned] FeedRows: {added} rows fed, pandoran specs now {list.Count}.");
+            ProbeRecruitMaxLevel(geo);
         }
 
-        /// <summary>RowLength sanity probe: log the first marked recruit's LevelProgression.Def.MaxLevel.</summary>
-        private static string DescribeRecruitMaxLevel(GeoLevelController geo)
+        /// <summary>
+        /// RowLength sanity probe: log the first marked recruit's LevelProgression.Def.MaxLevel.
+        /// A mismatch is ALWAYS surfaced as a WARNING (rows would render short/overflow).
+        /// </summary>
+        private static void ProbeRecruitMaxLevel(GeoLevelController geo)
         {
             GeoCharacter recruit = geo.PhoenixFaction.Characters?.FirstOrDefault(Phase4.IsPhase4Recruit);
-            if (recruit == null)
-            {
-                return "No marked recruit present (maxLevel unverified).";
-            }
-            int? maxLevel = recruit.LevelProgression?.Def?.MaxLevel;
+            int? maxLevel = recruit?.LevelProgression?.Def?.MaxLevel;
             if (maxLevel == null)
             {
-                return "Marked recruit has null LevelProgression (maxLevel unverified).";
+                TheTurnedMain.LogInfo("[TheTurned] FeedRows: no marked recruit with LevelProgression present (maxLevel unverified).");
             }
-            return maxLevel.Value == RowLength
-                ? $"Recruit MaxLevel={maxLevel.Value} matches RowLength."
-                : $"WARNING: recruit MaxLevel={maxLevel.Value} != RowLength={RowLength} — rows may render short/overflow.";
-        }
-
-        /// <summary>The Arthron's class tag (created by Tags.EnsureClassTag during BuildAllClasses).</summary>
-        private static ClassTagDef ResolveArthronClassTag(DefRepository repo)
-        {
-            ITurnedMonster arthron = MonsterRegistry.All.FirstOrDefault(m => m != null && m.Id == "Arthron");
-            return arthron != null ? Tags.GetClassTag(repo, arthron) : null;
+            else if (maxLevel.Value != RowLength)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] FeedRows: recruit MaxLevel={maxLevel.Value} != RowLength={RowLength} — rows may render short/overflow.");
+            }
+            else
+            {
+                TheTurnedMain.LogInfo($"[TheTurned] FeedRows: recruit MaxLevel={maxLevel.Value} matches RowLength.");
+            }
         }
     }
 }

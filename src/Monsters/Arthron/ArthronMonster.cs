@@ -129,12 +129,16 @@ namespace TheTurned.Monsters.Arthron
         /// </summary>
         internal static void BuildPhase4Rows(DefRepository repo)
         {
+            // Resolve the Arthron class tag ONCE (created by Tags.EnsureClassTag in BuildAllClasses).
+            ITurnedMonster arthron = MonsterRegistry.All.FirstOrDefault(m => m != null && m.Id == "Arthron");
+            ClassTagDef classTag = arthron != null ? Tags.GetClassTag(repo, arthron) : null;
+
             // ROW A — Bruiser: 5 design cells, padded to RowLength by the factory.
-            SpecRowFactory.GetOrCreateRow(repo, "Bruiser", "ARTHRON_ROW_BRUISER_NAME", "Arthron_Spec.png",
-                ArthronPerks.BuildRowCells(repo));
+            SpecRowFactory.GetOrCreateRow(repo, "Bruiser", "ARTHRON_ROW_BRUISER", "Arthron_Spec.png",
+                classTag, ArthronPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
             // ROW B — Gunner: 6 design cells, padded to RowLength by the factory.
-            SpecRowFactory.GetOrCreateRow(repo, "Gunner", "ARTHRON_ROW_GUNNER_NAME", "ArthronGunner_Spec.png",
-                ArthronGunnerPerks.BuildRowCells(repo));
+            SpecRowFactory.GetOrCreateRow(repo, "Gunner", "ARTHRON_ROW_GUNNER", "ArthronGunner_Spec.png",
+                classTag, ArthronGunnerPerks.BuildRowCells(repo), fillerIcon: "ArthronGunner_Spec.png");
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)
