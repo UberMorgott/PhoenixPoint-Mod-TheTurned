@@ -13,17 +13,17 @@ using UnityEngine;
 namespace TheTurned.Core
 {
     /// <summary>
-    /// Rolled weapon-arm slots for the recruited Arthron (Crabman). Arms are bodypart <c>WeaponDef</c>s
-    /// living in <c>GeoCharacter.ArmourItems</c>; right vs left is identified by the def-name substring
+    /// Physical arm/head equipment for the recruited Arthron (Crabman). Parts are bodypart items living in
+    /// <c>GeoCharacter.ArmourItems</c>; right vs left is identified by the def-name token
     /// (<c>Crabman_RightHand</c> / <c>Crabman_LeftHand</c>) — NOT array index.
     ///
-    /// Two personal-track slots are rolled at recruit: a RIGHT arm (claw / gun + elemental gun variants)
-    /// and a LEFT arm (shield / grenade + elemental grenade variants). Each option is represented by a
-    /// marker <see cref="PassiveModifierAbilityDef"/> placed in the personal track (so it renders and is a
-    /// valid PerkOracle swap target). The actual arm is DERIVED from whichever arm-markers are currently in
-    /// the unit's ability set via <see cref="ApplyRolledArms"/> (the single source of truth), applied with
-    /// <c>GeoCharacter.SetItems</c>. This makes PerkOracle swaps follow automatically (the
-    /// <see cref="ArmFollowHook"/> re-derives on <c>OnAbilityAdded</c>).
+    /// Phase-4: <see cref="ApplyChosenSets"/> is the SINGLE SOURCE OF TRUTH. It re-derives the desired
+    /// matched SETs (arm/head bodypart + hand weapon — C3: always swapped together) from the Phase-4
+    /// marker abilities currently learned (mutoid-popup progression / PerkOracle swaps) and applies them
+    /// with ONE <c>GeoCharacter.SetItems</c> call; <see cref="ArmFollowHook"/> re-runs it on every
+    /// <c>OnAbilityAdded</c>. <see cref="ResetMismatchedArms"/> is the §9 one-shot ADDITIVE migration for
+    /// pre-e403584 saves (hand weapon without its matched arm bodypart → default SET; otherwise C4: touch
+    /// nothing). Legacy Phase-3 recruit-time roll machinery is kept ONLY for old-save def compat, [Obsolete].
     ///
     /// Grounded API: arms = <c>TacCharacterDef.Data.BodypartItems[]</c> → descriptor <c>ArmorItems</c>
     /// → live <c>GeoCharacter._armourItems</c> (persisted <c>BodypartItemsData</c>); live swap via
@@ -34,6 +34,8 @@ namespace TheTurned.Core
     {
         internal const string RightHandToken = "Crabman_RightHand";
         internal const string LeftHandToken = "Crabman_LeftHand";
+        internal const string RightArmToken = "Crabman_RightArm";
+        internal const string LeftArmToken = "Crabman_LeftArm";
 
         /// <summary>One arm option: the bodypart weapon def + its marker ability + which side it occupies.</summary>
         internal sealed class ArmOption
@@ -249,9 +251,9 @@ namespace TheTurned.Core
 
                 var newList = new List<GeoItem>(geoChar.ArmourItems);
                 bool changed = false;
-                changed |= SwapSet(newList, "Crabman_RightHand", "Crabman_RightArm", wantRight,
+                changed |= SwapSet(newList, RightHandToken, RightArmToken, wantRight,
                                    (clawOverride != null && wantRight == CrabmanParts.DefaultRight) ? clawOverride : null);
-                changed |= SwapSet(newList, "Crabman_LeftHand", "Crabman_LeftArm", wantLeft, null);
+                changed |= SwapSet(newList, LeftHandToken, LeftArmToken, wantLeft, null);
                 changed |= SwapSet(newList, "Crabman_Head", "Crabman_Head", wantHead, null);
                 if (changed)
                 {
@@ -300,11 +302,11 @@ namespace TheTurned.Core
                 bool changed = false;
                 if (!rightOwned)
                 {
-                    changed |= ResetSideIfMismatched(items, RightHandToken, "Crabman_RightArm", CrabmanParts.DefaultRight, geoChar);
+                    changed |= ResetSideIfMismatched(items, RightHandToken, RightArmToken, CrabmanParts.DefaultRight, geoChar);
                 }
                 if (!leftOwned)
                 {
-                    changed |= ResetSideIfMismatched(items, LeftHandToken, "Crabman_LeftArm", CrabmanParts.DefaultLeft, geoChar);
+                    changed |= ResetSideIfMismatched(items, LeftHandToken, LeftArmToken, CrabmanParts.DefaultLeft, geoChar);
                 }
                 if (changed)
                 {
@@ -313,7 +315,7 @@ namespace TheTurned.Core
             }
             catch (Exception e)
             {
-                Log?.LogWarning($"[TheTurned] ResetMismatchedArms failed for '{geoChar.GetName()}': {e.Message}");
+                Log?.LogWarning($"[TheTurned] ResetMismatchedArms failed for '{geoChar.GetName()}': {e}");
             }
         }
 
