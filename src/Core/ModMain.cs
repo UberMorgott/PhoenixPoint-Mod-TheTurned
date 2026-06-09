@@ -46,6 +46,9 @@ namespace TheTurned
             // Apply the shared marker-scoped CheckIsHuman Postfix. Idempotent (guarded inside Apply).
             HumanClassificationPatch.Apply((Harmony)HarmonyInstance);
 
+            // Phase-4: OR our recruits into the mutoid progression gate (no-op when TFTV absent).
+            PandoranProgressionGate.Apply((Harmony)HarmonyInstance);
+
             // Attach the hotkey poller to the mod's live GameObject (persists for mod lifetime).
             GameObject go = ModGO;
             if (go != null)
@@ -108,7 +111,10 @@ namespace TheTurned
                 }
             }
             // Phase 4: enumerate + pair Crabman matched bodypart/hand SETs (idempotent, logs once).
-            CrabmanParts.Build(repo);
+            if (Phase4.Enabled)
+            {
+                CrabmanParts.Build(repo);
+            }
         }
     }
 }
