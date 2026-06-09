@@ -29,7 +29,8 @@ namespace TheTurned.Monsters.Arthron
                 return cells.ToArray();
             }
             LogBaseClawKeywordsOnce(baseClaw);
-            AddClawCell(repo, cells, baseClaw, "POISON", "Poisonous_DamageKeywordDataDef", 40f, 20,
+            AddClawCell(repo, cells, baseClaw, "POISON", "Poisonous_DamageKeywordDataDef",
+                WeaponVariants.PoisonOnHitValue, 20,
                 "ARTHRON_CLAW_POISON", "ArthronClaw_Poison.png");
             AddClawCell(repo, cells, baseClaw, "STUN", "Shock_DamageKeywordDataDef", 120f, 20,
                 "ARTHRON_CLAW_STUN", "ArthronClaw_Stun.png");
@@ -51,23 +52,9 @@ namespace TheTurned.Monsters.Arthron
                 TheTurnedMain.LogWarn($"[TheTurned] claw row: clone for '{key}' unavailable — cell skipped");
                 return;
             }
-            var marker = PerkFactory.BuildStatPassive(repo,
-                Phase4.DeriveGuid("claw:" + key).ToString(),
-                $"TheTurned_Arthron_Claw_{key}_AbilityDef",
-                Phase4.DeriveGuid("claw:" + key + "|prog").ToString(),
-                Phase4.DeriveGuid("claw:" + key + "|ved").ToString(),
-                baseLocKey + "_NAME", baseLocKey + "_DESC", icon,
-                skillPointCost: mutagenCost, mutagenCost: mutagenCost,
-                statMods: null);
-            if (marker == null)
-            {
-                TheTurnedMain.LogWarn($"[TheTurned] claw row: marker build failed for '{key}' — cell skipped");
-                return;
-            }
-            // Register AFTER BuildStatPassive on purpose: same-session BuildAllClasses re-runs hit its
-            // get-or-create EXISTING path, and the registry upsert must still run on every pass.
-            Phase4Markers.RegisterClawWeapon(marker, clawClone);
-            cells.Add(new AbilityTrackSlot { Ability = marker, RequiresPrevAbility = false });
+            Phase4RowCells.AddMarkerCell(repo, cells, "claw:" + key,
+                $"TheTurned_Arthron_Claw_{key}_AbilityDef", baseLocKey, icon, mutagenCost,
+                extraStats: null, register: m => Phase4Markers.RegisterClawWeapon(m, clawClone));
         }
 
         /// <summary>One-shot dump of the base claw's existing keywords — in-game calibration aid for the

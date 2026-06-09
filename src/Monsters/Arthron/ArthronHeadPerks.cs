@@ -38,7 +38,7 @@ namespace TheTurned.Monsters.Arthron
             AddHeadCell(repo, cells, spitterSet, "ACID", 20, "ARTHRON_SPRAY_ACID", "ArthronSpray_Acid.png");
             // Cell 2 — POISON: spitter weapon clone + poison keyword.
             AddHeadCell(repo, cells, BuildVariantSet(repo, spitterSet, "POISON",
-                    "Poisonous_DamageKeywordDataDef", 40f),
+                    "Poisonous_DamageKeywordDataDef", WeaponVariants.PoisonOnHitValue),
                 "POISON", 25, "ARTHRON_SPRAY_POISON", "ArthronSpray_Poison.png");
             // Cell 3 — GOO: spitter weapon clone + goo keyword (exact instance name verified in TFTV
             // real source: Goo_DamageKeywordEffectorDef, TFTVDefsInjectedOnlyOnce.cs:6841).
@@ -78,23 +78,9 @@ namespace TheTurned.Monsters.Arthron
                 TheTurnedMain.LogWarn($"[TheTurned] head row: SET '{key}' unavailable — cell skipped");
                 return;
             }
-            var marker = PerkFactory.BuildStatPassive(repo,
-                Phase4.DeriveGuid("spray:" + key).ToString(),
-                $"TheTurned_Arthron_Spray_{key}_AbilityDef",
-                Phase4.DeriveGuid("spray:" + key + "|prog").ToString(),
-                Phase4.DeriveGuid("spray:" + key + "|ved").ToString(),
-                baseLocKey + "_NAME", baseLocKey + "_DESC", icon,
-                skillPointCost: mutagenCost, mutagenCost: mutagenCost,
-                statMods: null);
-            if (marker == null)
-            {
-                TheTurnedMain.LogWarn($"[TheTurned] head row: marker build failed for '{key}' — cell skipped");
-                return;
-            }
-            // Register AFTER BuildStatPassive on purpose: same-session BuildAllClasses re-runs hit its
-            // get-or-create EXISTING path, and the registry upsert must still run on every pass.
-            Phase4Markers.RegisterHeadSet(marker, set);
-            cells.Add(new AbilityTrackSlot { Ability = marker, RequiresPrevAbility = false });
+            Phase4RowCells.AddMarkerCell(repo, cells, "spray:" + key,
+                $"TheTurned_Arthron_Spray_{key}_AbilityDef", baseLocKey, icon, mutagenCost,
+                extraStats: null, register: m => Phase4Markers.RegisterHeadSet(m, set));
         }
     }
 }

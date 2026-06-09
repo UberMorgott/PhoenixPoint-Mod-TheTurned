@@ -12,6 +12,10 @@ namespace TheTurned.Core
     /// </summary>
     internal static class WeaponVariants
     {
+        /// <summary>Shared poison-on-hit keyword Value for the claw + head/spray poison variants.
+        /// first-pass — tune in-game (base claw keyword dump in the log is the calibration aid).</summary>
+        internal const float PoisonOnHitValue = 40f;
+
         /// <summary>
         /// Idempotently clone <paramref name="source"/> and append one
         /// <c>DamageKeywordPair { keywordDefName, keywordValue }</c> to the clone's payload.

@@ -45,23 +45,9 @@ namespace TheTurned.Monsters.Arthron
                 TheTurnedMain.LogWarn($"[TheTurned] arms row: SET '{key}' unresolved — cell skipped");
                 return;
             }
-            var marker = PerkFactory.BuildStatPassive(repo,
-                Phase4.DeriveGuid("armset:" + key).ToString(),
-                $"TheTurned_Arthron_ArmSet_{key}_AbilityDef",
-                Phase4.DeriveGuid("armset:" + key + "|prog").ToString(),
-                Phase4.DeriveGuid("armset:" + key + "|ved").ToString(),
-                baseLocKey + "_NAME", baseLocKey + "_DESC", icon,
-                skillPointCost: mutagenCost, mutagenCost: mutagenCost,
-                extraStats);
-            if (marker == null)
-            {
-                TheTurnedMain.LogWarn($"[TheTurned] arms row: marker build failed for '{key}' — cell skipped");
-                return;
-            }
-            // Register AFTER BuildStatPassive on purpose: same-session BuildAllClasses re-runs hit its
-            // get-or-create EXISTING path, and the registry upsert must still run on every pass.
-            Phase4Markers.RegisterArmSet(marker, set);
-            cells.Add(new AbilityTrackSlot { Ability = marker, RequiresPrevAbility = false });
+            Phase4RowCells.AddMarkerCell(repo, cells, "armset:" + key,
+                $"TheTurned_Arthron_ArmSet_{key}_AbilityDef", baseLocKey, icon, mutagenCost,
+                extraStats, m => Phase4Markers.RegisterArmSet(m, set));
         }
 
         private static MatchedSet FindRight(string token, string exclude = null)
