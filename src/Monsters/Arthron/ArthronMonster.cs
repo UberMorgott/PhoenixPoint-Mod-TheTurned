@@ -152,7 +152,7 @@ namespace TheTurned.Monsters.Arthron
             {
                 TheTurnedMain.LogWarn("[TheTurned] arms row deferred — Crabman sets not resolved yet");
             }
-            // ROW D — Claw Strikes: status-on-hit claw clones. Same gating rationale as Arms: building
+            // ROW E — Claw Strikes: status-on-hit claw clones. Same gating rationale as Arms: building
             // before the base claw resolves would bake a filler-only track PERMANENTLY.
             if (CrabmanParts.DefaultRight?.Hand != null)
             {
@@ -163,7 +163,7 @@ namespace TheTurned.Monsters.Arthron
             {
                 TheTurnedMain.LogWarn("[TheTurned] claw row deferred — base claw weapon not resolved yet");
             }
-            // ROW E — Head/Spray: native spitter set + keyword-clone variants. Gated on the SPITTER set
+            // ROW D — Head/Spray: native spitter set + keyword-clone variants. Gated on the SPITTER set
             // specifically (not just HeadSets.Count) — same permanent-filler-bake rationale.
             if (ArthronHeadPerks.FindSpitterSet() != null)
             {
