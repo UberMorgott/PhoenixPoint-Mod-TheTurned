@@ -40,6 +40,8 @@ namespace TheTurned.Core
                     if (IsTurnedArthron(geoChar))
                     {
                         Subscribe(geoChar);
+                        // §9 one-shot migration of pre-e403584 arm rolls (additive, C4).
+                        ArthronArms.ResetMismatchedArms(geoChar);
                     }
                 }
             }

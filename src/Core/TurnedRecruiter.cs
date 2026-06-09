@@ -67,12 +67,6 @@ namespace TheTurned.Core
                 // 3. Build a descriptor from the live template (bodyparts/equipment/inventory copied).
                 GeoUnitDescriptor descriptor = geo.CharacterGenerator.GenerateUnit(geo.PhoenixFaction, template);
 
-                // 3b. Arm roll DISABLED. Rolled hand WeaponDefs without compatible arm BodyPartDefs caused
-                //     22k engine addon-attach errors + broken visuals (shield+gun+no claw). Recruit now keeps
-                //     the pure default template loadout (vanilla pincer + shield) and vanilla rolled perks.
-                // Phase 4: arm choice will be reimplemented via mutoid-style progression (see design doc).
-                // RollArmsIntoDescriptor(monster, descriptor);
-
                 // 4. Spawn the GeoCharacter (registers in the level's unit list).
                 GeoCharacter geoChar = descriptor.SpawnAsCharacter();
                 if (geoChar == null)
@@ -81,15 +75,14 @@ namespace TheTurned.Core
                     return;
                 }
 
-                // 4b. Phase 3: ensure the second spec wired (auto via tags; fallback explicit), then attach
-                //     the arm-follow hook and re-derive the physical arms once.
+                // 4b. Phase 3: ensure the second spec wired (auto via tags; fallback explicit).
                 WireSecondarySpecIfMissing(monster, geoChar);
-                // Phase 4: arm choice will be reimplemented via mutoid-style progression (see design doc).
-                // ArmFollowHook subscription disabled along with the arm roll (no rolled arms to follow).
-                // if (monster.HasRolledArms)
-                // {
-                //     ArmFollowHook.Subscribe(geoChar);
-                // }
+                if (Phase4.Enabled)
+                {
+                    // C1: popup-only progression. Keep slot 0 (class proficiency = identity), blank the rest.
+                    geoChar.Progression?.ClearAbilityTrack(AbilityTrackSource.Personal, keepFirstAbility: true);
+                    ArmFollowHook.Subscribe(geoChar);   // matched-SET re-derive on every future level-up
+                }
 
                 // 5. Route into the Phoenix roster via the native grant path (GiveUnits -> AddRecruit).
                 GeoSite recruitSite = geo.PhoenixFaction.Bases?.FirstOrDefault()?.Site;
@@ -184,6 +177,7 @@ namespace TheTurned.Core
         ///    matching the user spec. Markers are ordinary personal-track abilities so PerkOracle can swap them.
         /// No-op for monsters without rolled arms or when no arm options were discovered.
         /// </summary>
+        [Obsolete("Phase-4: popup progression replaced rolls")]
         private static void RollArmsIntoDescriptor(ITurnedMonster monster, GeoUnitDescriptor descriptor)
         {
             if (monster == null || !monster.HasRolledArms || descriptor == null || !ArthronArms.HasOptions)
@@ -227,6 +221,7 @@ namespace TheTurned.Core
         }
 
         /// <summary>Remove the existing arm bodypart matching <paramref name="token"/> and add the rolled one.</summary>
+        [Obsolete("Phase-4: popup progression replaced rolls")]
         private static void ReplaceArm(List<TacticalItemDef> armour, string token, WeaponDef newArm)
         {
             armour.RemoveAll(d => d != null && d.name != null && d.name.Contains(token));
@@ -238,6 +233,7 @@ namespace TheTurned.Core
         /// the supplied marker abilities, each placed at a distinct free level key. The personal track length
         /// equals the level-progression MaxLevel, so there are always enough free keys.
         /// </summary>
+        [Obsolete("Phase-4: popup progression replaced rolls")]
         private static void InjectMarkersKeepTwoVanilla(Dictionary<int, TacticalAbilityDef> personal, List<PassiveModifierAbilityDef> markers)
         {
             const int keepVanilla = 2;

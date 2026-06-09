@@ -266,6 +266,104 @@ namespace TheTurned.Core
             }
         }
 
+        // §9 migration: characters already checked this session (one-shot; ScanAndSubscribe re-runs on every
+        // geoscape load, the cleanup must not).
+        private static readonly HashSet<GeoCharacter> _migrationChecked = new HashSet<GeoCharacter>();
+
+        /// <summary>§9 arm-roll cleanup: pre-e403584 saves may carry a hand weapon without its matched arm bodypart.
+        /// If a side has a Crabman hand weapon whose matched arm bodypart is absent AND no Phase-4 arm/claw marker is
+        /// learned for that side, reset that side to the default SET (one SetItems). Additive otherwise (C4).</summary>
+        internal static void ResetMismatchedArms(GeoCharacter geoChar)
+        {
+            if (!CrabmanParts.HasSets || geoChar?.Progression == null || !_migrationChecked.Add(geoChar))
+            {
+                return;
+            }
+            try
+            {
+                // Sides owned by a learned Phase-4 marker are skipped: ApplyChosenSets is the source of
+                // truth there (a claw marker owns the RIGHT side — its clone replaces the default hand).
+                bool rightOwned = false, leftOwned = false;
+                foreach (TacticalAbilityDef ability in EnumerateLearnedAbilities(geoChar.Progression))
+                {
+                    if (Phase4Markers.TryGetArmSet(ability, out MatchedSet set))
+                    {
+                        if (set.IsRight) { rightOwned = true; } else { leftOwned = true; }
+                    }
+                    else if (Phase4Markers.TryGetClawWeapon(ability, out _))
+                    {
+                        rightOwned = true;
+                    }
+                }
+
+                var items = new List<GeoItem>(geoChar.ArmourItems);
+                bool changed = false;
+                if (!rightOwned)
+                {
+                    changed |= ResetSideIfMismatched(items, RightHandToken, "Crabman_RightArm", CrabmanParts.DefaultRight, geoChar);
+                }
+                if (!leftOwned)
+                {
+                    changed |= ResetSideIfMismatched(items, LeftHandToken, "Crabman_LeftArm", CrabmanParts.DefaultLeft, geoChar);
+                }
+                if (changed)
+                {
+                    geoChar.SetItems(armour: items);
+                }
+            }
+            catch (Exception e)
+            {
+                Log?.LogWarning($"[TheTurned] ResetMismatchedArms failed for '{geoChar.GetName()}': {e.Message}");
+            }
+        }
+
+        /// <summary>One side of the §9 cleanup: hand weapon present but its variant-matched arm bodypart absent
+        /// -> swap the side to <paramref name="defaultSet"/> (mutates <paramref name="items"/> only; the caller
+        /// commits with ONE SetItems). Returns true when the side was reset.</summary>
+        private static bool ResetSideIfMismatched(List<GeoItem> items, string handToken, string armToken,
+            MatchedSet defaultSet, GeoCharacter geoChar)
+        {
+            if (defaultSet == null)
+            {
+                return false;
+            }
+            WeaponDef hand = items.Select(i => i?.ItemDef as WeaponDef)
+                .FirstOrDefault(d => d?.name != null && d.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (hand == null)
+            {
+                return false; // no hand weapon on that side -> nothing to migrate (C4: additive)
+            }
+            // Variant token of the hand (substring-safe: Task-8 clones carry a TheTurned_ name prefix).
+            string handVariant = CrabmanParts.VariantToken(
+                hand.name.Substring(hand.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase)), handToken);
+            bool armPresent = items.Any(i =>
+            {
+                var d = i?.ItemDef;
+                if (d?.name == null || d is WeaponDef)
+                {
+                    return false;
+                }
+                int at = d.name.IndexOf(armToken, StringComparison.OrdinalIgnoreCase);
+                if (at < 0)
+                {
+                    return false;
+                }
+                string armVariant = CrabmanParts.VariantToken(d.name.Substring(at), armToken);
+                return CrabmanParts.TokenExact(armVariant, handVariant) || CrabmanParts.TokenFuzzy(armVariant, handVariant);
+            });
+            if (armPresent)
+            {
+                return false; // hand+arm consistent -> leave the roll alone (C4: additive)
+            }
+            bool changed = SwapSet(items, handToken, armToken, defaultSet, null);
+            if (changed)
+            {
+                Log?.LogWarning($"[TheTurned] §9 migration: '{geoChar.GetName()}' hand '{hand.name}' had no matched "
+                    + $"'{armToken}' bodypart — side reset to default set '{defaultSet.Token}'.");
+            }
+            return changed;
+        }
+
         /// <summary>Replace BOTH items of a side with the desired set. desired == null -> side untouched (never strip unchosen).</summary>
         private static bool SwapSet(List<GeoItem> items, string handToken, string bodyToken, MatchedSet desired, WeaponDef handOverride)
         {

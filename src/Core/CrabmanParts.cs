@@ -116,7 +116,7 @@ namespace TheTurned.Core
         // "Crabman_RightHand_Viral_Gun_WeaponDef" + prefix "Crabman_RightHand" -> "Viral_Gun";
         // variant-less "Crabman_Head_BodyPartDef" -> "" (suffix stripped from the RAW remainder FIRST,
         // then '_' trimmed — trimming first would leave token "BodyPartDef").
-        private static string VariantToken(string defName, string prefix)
+        internal static string VariantToken(string defName, string prefix)
         {
             string s = defName.Substring(prefix.Length);
             foreach (var suffix in new[] { "_WeaponDef", "_BodyPartDef", "_ItemDef", "_TacticalItemDef" })
@@ -124,12 +124,12 @@ namespace TheTurned.Core
             return s.Trim('_');
         }
 
-        private static bool TokenExact(string a, string b)
+        internal static bool TokenExact(string a, string b)
             => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
         // Substring fallback. Empty tokens NEVER fuzzy-match (empty matches only exact-empty via
         // TokenExact) — "".IndexOf / IndexOf("") == 0 would otherwise match everything.
-        private static bool TokenFuzzy(string a, string b)
+        internal static bool TokenFuzzy(string a, string b)
             => !string.IsNullOrEmpty(a) && !string.IsNullOrEmpty(b)
             && (a.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0
              || b.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0);
