@@ -67,9 +67,11 @@ namespace TheTurned.Core
                 // 3. Build a descriptor from the live template (bodyparts/equipment/inventory copied).
                 GeoUnitDescriptor descriptor = geo.CharacterGenerator.GenerateUnit(geo.PhoenixFaction, template);
 
-                // 3b. Phase 3: roll the right/left arm + bake the rolled arms and the two arm-marker
-                //     personal abilities into the descriptor (so the personal track = 2 markers + 2 vanilla).
-                RollArmsIntoDescriptor(monster, descriptor);
+                // 3b. Arm roll DISABLED. Rolled hand WeaponDefs without compatible arm BodyPartDefs caused
+                //     22k engine addon-attach errors + broken visuals (shield+gun+no claw). Recruit now keeps
+                //     the pure default template loadout (vanilla pincer + shield) and vanilla rolled perks.
+                // Phase 4: arm choice will be reimplemented via mutoid-style progression (see design doc).
+                // RollArmsIntoDescriptor(monster, descriptor);
 
                 // 4. Spawn the GeoCharacter (registers in the level's unit list).
                 GeoCharacter geoChar = descriptor.SpawnAsCharacter();
@@ -82,10 +84,12 @@ namespace TheTurned.Core
                 // 4b. Phase 3: ensure the second spec wired (auto via tags; fallback explicit), then attach
                 //     the arm-follow hook and re-derive the physical arms once.
                 WireSecondarySpecIfMissing(monster, geoChar);
-                if (monster.HasRolledArms)
-                {
-                    ArmFollowHook.Subscribe(geoChar);
-                }
+                // Phase 4: arm choice will be reimplemented via mutoid-style progression (see design doc).
+                // ArmFollowHook subscription disabled along with the arm roll (no rolled arms to follow).
+                // if (monster.HasRolledArms)
+                // {
+                //     ArmFollowHook.Subscribe(geoChar);
+                // }
 
                 // 5. Route into the Phoenix roster via the native grant path (GiveUnits -> AddRecruit).
                 GeoSite recruitSite = geo.PhoenixFaction.Bases?.FirstOrDefault()?.Site;

@@ -65,17 +65,18 @@ namespace TheTurned
 
         public override void OnLevelStart(Level level)
         {
-            // On geoscape ("Home") start, re-subscribe the arm-follow hook on each recruited Arthron so a
-            // PerkOracle swap (or a reload) keeps the physical arms in sync. Idempotent.
-            if (level != null && level.name != null && level.name.Contains("Home"))
-            {
-                GeoLevelController geo = level.GetComponent<GeoLevelController>();
-                if (geo != null)
-                {
-                    ArmFollowHook.ScanAndSubscribe(geo);
-                    Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
-                }
-            }
+            // Arm-follow hook DISABLED along with the arm roll (rolled hand WeaponDefs lacked compatible arm
+            // BodyPartDefs → 22k addon-attach errors). Nothing to keep in sync until arms return.
+            // Phase 4: arm choice will be reimplemented via mutoid-style progression (see design doc).
+            // if (level != null && level.name != null && level.name.Contains("Home"))
+            // {
+            //     GeoLevelController geo = level.GetComponent<GeoLevelController>();
+            //     if (geo != null)
+            //     {
+            //         ArmFollowHook.ScanAndSubscribe(geo);
+            //         Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
+            //     }
+            // }
         }
 
         public override void OnLevelEnd(Level level)
