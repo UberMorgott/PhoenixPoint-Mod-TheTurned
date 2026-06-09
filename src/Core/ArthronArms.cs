@@ -143,7 +143,7 @@ namespace TheTurned.Core
                 WeaponDef desiredLeft = null;
                 // Scan BOTH the personal-track slots (where a rolled/swapped marker always lives, even before
                 // it is "learned" on level-up) AND the learned ability set (PerkOracle AddAbility path).
-                foreach (TacticalAbilityDef ability in EnumerateArmMarkers(geoChar.Progression))
+                foreach (TacticalAbilityDef ability in EnumerateLearnedAbilities(geoChar.Progression))
                 {
                     if (ability?.Guid != null && _byMarkerGuid.TryGetValue(ability.Guid, out ArmOption opt) && opt.Weapon != null)
                     {
@@ -223,7 +223,7 @@ namespace TheTurned.Core
                 }
                 MatchedSet wantRight = null, wantLeft = null, wantHead = null;
                 WeaponDef clawOverride = null; // claw row: cloned claw weapon replaces the default right set's hand
-                foreach (TacticalAbilityDef ability in EnumerateArmMarkers(geoChar.Progression))
+                foreach (TacticalAbilityDef ability in EnumerateLearnedAbilities(geoChar.Progression))
                 {
                     if (ability == null)
                     {
@@ -250,9 +250,9 @@ namespace TheTurned.Core
                 var newList = new List<GeoItem>(geoChar.ArmourItems);
                 bool changed = false;
                 changed |= SwapSet(newList, "Crabman_RightHand", "Crabman_RightArm", wantRight,
-                                   clawOverride != null && wantRight == CrabmanParts.DefaultRight ? clawOverride : wantRight?.Hand);
-                changed |= SwapSet(newList, "Crabman_LeftHand", "Crabman_LeftArm", wantLeft, wantLeft?.Hand);
-                changed |= SwapSet(newList, "Crabman_Head", "Crabman_Head", wantHead, wantHead?.Hand);
+                                   (clawOverride != null && wantRight == CrabmanParts.DefaultRight) ? clawOverride : null);
+                changed |= SwapSet(newList, "Crabman_LeftHand", "Crabman_LeftArm", wantLeft, null);
+                changed |= SwapSet(newList, "Crabman_Head", "Crabman_Head", wantHead, null);
                 if (changed)
                 {
                     geoChar.SetItems(armour: newList);
@@ -280,6 +280,8 @@ namespace TheTurned.Core
             {
                 return false;
             }
+            // CONTRACT: cloned hand weapons MUST keep the side token (e.g. TheTurned_Crabman_RightHand_*)
+            // in their def name or this removal will miss them (Task-8 claw clones rely on this).
             items.RemoveAll(i => i?.ItemDef?.name != null &&
                 (i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0
               || (i.ItemDef.name.IndexOf(bodyToken, StringComparison.OrdinalIgnoreCase) >= 0 && !(i.ItemDef is WeaponDef))));
@@ -291,8 +293,9 @@ namespace TheTurned.Core
             return true;
         }
 
-        /// <summary>Yield every arm-marker ability present in the personal track slots + the learned set.</summary>
-        private static IEnumerable<TacticalAbilityDef> EnumerateArmMarkers(PhoenixPoint.Common.Entities.Characters.CharacterProgression prog)
+        /// <summary>Yield every ability present in the personal track slots + the learned set. Feeds the
+        /// Phase-4 marker lookups (arm SET + head SET + claw markers) and the legacy arm-marker scan.</summary>
+        private static IEnumerable<TacticalAbilityDef> EnumerateLearnedAbilities(PhoenixPoint.Common.Entities.Characters.CharacterProgression prog)
         {
             var personal = prog.PersonalAbilityTrack;
             if (personal?.AbilitiesByLevel != null)

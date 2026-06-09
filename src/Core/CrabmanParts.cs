@@ -21,6 +21,7 @@ namespace TheTurned.Core
     {
         private static bool _built;
         private static bool _logged;
+        private static bool _attempted;
         internal static readonly List<MatchedSet> RightArmSets = new List<MatchedSet>();
         internal static readonly List<MatchedSet> LeftArmSets = new List<MatchedSet>();
         internal static readonly List<MatchedSet> HeadSets = new List<MatchedSet>();
@@ -63,21 +64,31 @@ namespace TheTurned.Core
             PairSide(hands, bodyparts, "Crabman_LeftHand", "Crabman_LeftArm", LeftArmSets, isRight: false);
             PairHeads(hands, bodyparts);
             PickDefaults();
+            bool firstAttempt = !_attempted;
+            _attempted = true;
             _built = HasSets;
-            TheTurnedMain.LogInfo($"[TheTurned] CrabmanParts: right={RightArmSets.Count} left={LeftArmSets.Count} head={HeadSets.Count} " +
-                $"defaults R='{DefaultRight?.BodyPart?.name}/{DefaultRight?.Hand?.name}' L='{DefaultLeft?.BodyPart?.name}/{DefaultLeft?.Hand?.name}' H='{DefaultHead?.BodyPart?.name}'");
+            // Summary only on the successful (HasSets) attempt or the very first one — the failed-retry
+            // path (Build re-called on every geoscape return until defs appear) must not spam the log.
+            if (_built || firstAttempt)
+            {
+                TheTurnedMain.LogInfo($"[TheTurned] CrabmanParts: right={RightArmSets.Count} left={LeftArmSets.Count} head={HeadSets.Count} " +
+                    $"defaults R='{DefaultRight?.BodyPart?.name}/{DefaultRight?.Hand?.name}' L='{DefaultLeft?.BodyPart?.name}/{DefaultLeft?.Hand?.name}' H='{DefaultHead?.BodyPart?.name}'");
+            }
         }
 
         private static void PairSide(List<WeaponDef> hands, List<TacticalItemDef> bodyparts,
             string handPrefix, string armPrefix, List<MatchedSet> into, bool isRight)
         {
             into.Clear();
+            var candidates = bodyparts
+                .Where(b => b.name.StartsWith(armPrefix, StringComparison.OrdinalIgnoreCase)).ToList();
             foreach (var hand in hands.Where(h => h.name.StartsWith(handPrefix, StringComparison.OrdinalIgnoreCase)))
             {
                 string token = VariantToken(hand.name, handPrefix);
-                var arm = bodyparts.FirstOrDefault(b =>
-                    b.name.StartsWith(armPrefix, StringComparison.OrdinalIgnoreCase)
-                    && TokenMatches(VariantToken(b.name, armPrefix), token));
+                // Pass 1: exact token match; pass 2: substring fallback ONLY if no exact hit
+                // (prevents 'Viral_Gun' hand pairing to the plain 'Gun' arm when an exact arm exists).
+                var arm = candidates.FirstOrDefault(b => TokenExact(VariantToken(b.name, armPrefix), token))
+                       ?? candidates.FirstOrDefault(b => TokenFuzzy(VariantToken(b.name, armPrefix), token));
                 if (arm == null)
                 {
                     TheTurnedMain.LogWarn($"[TheTurned] no matched {armPrefix} bodypart for hand '{hand.name}' (token '{token}') — set skipped (C3)");
@@ -90,39 +101,55 @@ namespace TheTurned.Core
         private static void PairHeads(List<WeaponDef> hands, List<TacticalItemDef> bodyparts)
         {
             HeadSets.Clear();
+            var headWeapons = hands
+                .Where(h => h.name.StartsWith("Crabman_Head", StringComparison.OrdinalIgnoreCase)).ToList();
             foreach (var bp in bodyparts.Where(b => b.name.StartsWith("Crabman_Head", StringComparison.OrdinalIgnoreCase)))
             {
                 string token = VariantToken(bp.name, "Crabman_Head");
-                var weapon = hands.FirstOrDefault(h =>
-                    h.name.StartsWith("Crabman_Head", StringComparison.OrdinalIgnoreCase)
-                    && TokenMatches(VariantToken(h.name, "Crabman_Head"), token));
+                // Same two-pass policy as PairSide: exact first, substring fallback only when no exact hit.
+                var weapon = headWeapons.FirstOrDefault(h => TokenExact(VariantToken(h.name, "Crabman_Head"), token))
+                          ?? headWeapons.FirstOrDefault(h => TokenFuzzy(VariantToken(h.name, "Crabman_Head"), token));
                 HeadSets.Add(new MatchedSet { BodyPart = bp, Hand = weapon, IsRight = false, Token = token });
             }
         }
 
-        // "Crabman_RightHand_Viral_Gun_WeaponDef" + prefix "Crabman_RightHand" -> "Viral_Gun"
+        // "Crabman_RightHand_Viral_Gun_WeaponDef" + prefix "Crabman_RightHand" -> "Viral_Gun";
+        // variant-less "Crabman_Head_BodyPartDef" -> "" (suffix stripped from the RAW remainder FIRST,
+        // then '_' trimmed — trimming first would leave token "BodyPartDef").
         private static string VariantToken(string defName, string prefix)
         {
-            string s = defName.Substring(prefix.Length).TrimStart('_');
+            string s = defName.Substring(prefix.Length);
             foreach (var suffix in new[] { "_WeaponDef", "_BodyPartDef", "_ItemDef", "_TacticalItemDef" })
                 if (s.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) { s = s.Substring(0, s.Length - suffix.Length); break; }
-            return s;
+            return s.Trim('_');
         }
 
-        private static bool TokenMatches(string a, string b)
-            => string.Equals(a, b, StringComparison.OrdinalIgnoreCase)
-            || a.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0
-            || b.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0;
+        private static bool TokenExact(string a, string b)
+            => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+        // Substring fallback. Empty tokens NEVER fuzzy-match (empty matches only exact-empty via
+        // TokenExact) — "".IndexOf / IndexOf("") == 0 would otherwise match everything.
+        private static bool TokenFuzzy(string a, string b)
+            => !string.IsNullOrEmpty(a) && !string.IsNullOrEmpty(b)
+            && (a.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0
+             || b.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0);
 
         private static void PickDefaults()
         {
             DefaultRight = RightArmSets.FirstOrDefault(s => s.Token.IndexOf("Pincer", StringComparison.OrdinalIgnoreCase) >= 0
                                                          || s.Token.IndexOf("Claw", StringComparison.OrdinalIgnoreCase) >= 0)
-                        ?? RightArmSets.FirstOrDefault(s => s.Token.IndexOf("Gun", StringComparison.OrdinalIgnoreCase) < 0);
-            DefaultLeft = LeftArmSets.FirstOrDefault(s => s.Token.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0);
+                        ?? RightArmSets.FirstOrDefault(s => s.Token.IndexOf("Gun", StringComparison.OrdinalIgnoreCase) < 0)
+                        ?? RightArmSets.FirstOrDefault();
+            DefaultLeft = LeftArmSets.FirstOrDefault(s => s.Token.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0)
+                       ?? LeftArmSets.FirstOrDefault();
             DefaultHead = HeadSets.FirstOrDefault(s => s.Token.IndexOf("Spitter", StringComparison.OrdinalIgnoreCase) < 0
                                                     && s.Token.IndexOf("Humanoid", StringComparison.OrdinalIgnoreCase) < 0)
                        ?? HeadSets.FirstOrDefault();
+            if (DefaultRight == null || DefaultLeft == null || DefaultHead == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] CrabmanParts default(s) missing: "
+                    + $"R={(DefaultRight != null)} L={(DefaultLeft != null)} H={(DefaultHead != null)}");
+            }
         }
     }
 }
