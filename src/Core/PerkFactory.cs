@@ -2,7 +2,9 @@ using Base.Defs;
 using Base.Entities.Abilities;
 using Base.Entities.Statuses;
 using Base.UI;
+using PhoenixPoint.Common.Core;
 using PhoenixPoint.Common.Entities;
+using PhoenixPoint.Common.Entities.GameTags;
 using PhoenixPoint.Common.UI;
 using PhoenixPoint.Tactical.Entities.Abilities;
 using PhoenixPoint.Tactical.Entities.Equipments;
@@ -74,6 +76,44 @@ namespace TheTurned.Core
             perk.CharacterProgressionData = BuildProgression(repo, progGuid, abilityName, skillPointCost, mutagenCost);
             perk.ViewElementDef = BuildVed(repo, vedGuid, abilityName, nameLocKey, descLocKey, iconFileName);
             return perk;
+        }
+
+        /// <summary>
+        /// Build (idempotently) a PERSONAL-TRACK marker perk: a <see cref="PassiveModifierAbilityDef"/> with
+        /// no stat modifications, whose progression carries the shared <c>PersonalProgressionTag</c> so the
+        /// game treats it as a legitimate personal/rolled ability (renders in the personal row and is a valid
+        /// PerkOracle swap target). Used for the rolled weapon-arm markers (Feature 2). The arm geometry is
+        /// driven separately via <c>SetItems</c>; this def only carries identity (loc + icon).
+        /// </summary>
+        internal static PassiveModifierAbilityDef BuildMarker(
+            DefRepository repo,
+            string abilityGuid,
+            string abilityName,
+            string progGuid,
+            string vedGuid,
+            string nameLocKey,
+            string descLocKey,
+            string iconFileName)
+        {
+            PassiveModifierAbilityDef marker = BuildStatPassive(repo, abilityGuid, abilityName, progGuid, vedGuid,
+                nameLocKey, descLocKey, iconFileName, skillPointCost: 0, mutagenCost: 0, statMods: null);
+            // Tag the progression as a personal-track ability (same filter the generator's pool uses).
+            if (marker?.CharacterProgressionData != null)
+            {
+                GameTagDef personalTag = ResolvePersonalProgressionTag();
+                if (personalTag != null)
+                {
+                    marker.CharacterProgressionData.PersonalTrackTags = new[] { personalTag };
+                }
+            }
+            return marker;
+        }
+
+        /// <summary>Resolve the shared <c>PersonalProgressionTag</c> (the personal-pool filter tag).</summary>
+        private static GameTagDef ResolvePersonalProgressionTag()
+        {
+            SharedData shared = Base.Core.GameUtl.GameComponent<SharedData>();
+            return shared?.SharedGameTags?.PersonalProgressionTag;
         }
 
         /// <summary>Convenience: a single Add stat modification.</summary>

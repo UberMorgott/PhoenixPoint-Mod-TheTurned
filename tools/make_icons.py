@@ -24,6 +24,17 @@ SOURCES = {
     "Arthron_HardenedHide":  "Arthron_HardenedHide_v2_00001_.png",
     "Arthron_ApexCarapace":  "Arthron_ApexCarapace_v2_00001_.png",
     "Arthron_Spec":          "Arthron_Spec_v2_00001_.png",
+    # Phase 3 — Carapace Gunner second spec row
+    "ArthronGunner_Spec":              "ArthronGunner_Spec_v1_00001_.png",
+    "ArthronGunner_SteadyAim":         "ArthronGunner_SteadyAim_v1_00001_.png",
+    "ArthronGunner_SuppressPlates":    "ArthronGunner_SuppressPlates_v2_00001_.png",
+    "ArthronGunner_LongBarrel":        "ArthronGunner_LongBarrel_v1_00001_.png",
+    "ArthronGunner_ReturnFire":        "ArthronGunner_ReturnFire_v1_00001_.png",
+    "ArthronGunner_Spotter":           "ArthronGunner_Spotter_v1_00001_.png",
+    "ArthronGunner_OverwatchCarapace": "ArthronGunner_OverwatchCarapace_v1_00001_.png",
+    # Phase 3 — arm-roll marker fallbacks
+    "Arthron_ArmRight":                "Arthron_ArmRight_v3_00001_.png",
+    "Arthron_ArmLeft":                 "Arthron_ArmLeft_v1_00001_.png",
 }
 
 

@@ -1,5 +1,6 @@
 using Base.Levels;
 using HarmonyLib;
+using PhoenixPoint.Geoscape.Levels;
 using PhoenixPoint.Modding;
 using TheTurned.Core;
 using UnityEngine;
@@ -64,7 +65,17 @@ namespace TheTurned
 
         public override void OnLevelStart(Level level)
         {
-            // No work needed on level start; classes are (re)built on enable + on geoscape unload.
+            // On geoscape ("Home") start, re-subscribe the arm-follow hook on each recruited Arthron so a
+            // PerkOracle swap (or a reload) keeps the physical arms in sync. Idempotent.
+            if (level != null && level.name != null && level.name.Contains("Home"))
+            {
+                GeoLevelController geo = level.GetComponent<GeoLevelController>();
+                if (geo != null)
+                {
+                    ArmFollowHook.ScanAndSubscribe(geo);
+                    Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
+                }
+            }
         }
 
         public override void OnLevelEnd(Level level)
@@ -84,6 +95,12 @@ namespace TheTurned
             foreach (ITurnedMonster monster in MonsterRegistry.All)
             {
                 TurnedClassFactory.EnsureClass(repo, monster);
+                // Phase 3: build the optional second spec row + the rolled arm-option marker defs.
+                TurnedClassFactory.EnsureSecondaryClass(repo, monster);
+                if (monster.HasRolledArms)
+                {
+                    monster.BuildArmOptions(repo);
+                }
             }
         }
     }

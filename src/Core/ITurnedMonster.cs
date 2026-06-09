@@ -64,5 +64,40 @@ namespace TheTurned.Core
         string ClassTagGuid { get; }
         string SpecVedGuid { get; }
         string ProficiencyVedGuid { get; }
+
+        // --- Phase 3: second specialization row (optional) --------------------------------------
+        /// <summary>True if this monster has a second specialization tree (Carapace Gunner for Arthron).</summary>
+        bool HasSecondarySpec { get; }
+
+        string SecondarySpecName { get; }
+        string SecondarySpecDisplayName { get; }
+        string SecondarySpecDescription { get; }
+        string SecondaryIconFileName { get; }
+
+        string SecondaryClassTagName { get; }
+        string SecondaryClassTagGuid { get; }
+        string SecondarySpecGuid { get; }
+        string SecondaryTrackGuid { get; }
+        string SecondaryProficiencyGuid { get; }
+        string SecondaryProficiencyProgGuid { get; }
+        string SecondarySpecVedGuid { get; }
+        string SecondaryProficiencyVedGuid { get; }
+
+        /// <summary>
+        /// Build the second tree's 7 slots. Slot 0 MUST be the supplied secondary <paramref name="proficiency"/>.
+        /// Only called when <see cref="HasSecondarySpec"/> is true.
+        /// </summary>
+        AbilityTrackSlot[] BuildSecondaryAbilityTrack(DefRepository repo, ClassProficiencyAbilityDef proficiency);
+
+        // --- Phase 3: rolled weapon arm slots (optional) ----------------------------------------
+        /// <summary>True if this monster rolls right/left arm bodypart weapons at recruit (Arthron).</summary>
+        bool HasRolledArms { get; }
+
+        /// <summary>
+        /// Idempotently discover the monster's arm <c>WeaponDef</c>s (log-once), build one marker
+        /// ability per option, and register the marker↔arm-def maps. Only called when
+        /// <see cref="HasRolledArms"/> is true.
+        /// </summary>
+        void BuildArmOptions(DefRepository repo);
     }
 }

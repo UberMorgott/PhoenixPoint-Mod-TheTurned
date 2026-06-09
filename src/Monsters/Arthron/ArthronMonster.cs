@@ -44,6 +44,25 @@ namespace TheTurned.Monsters.Arthron
         public override string SpecVedGuid => "b8da0c2e-7c9e-a0b1-ed3f-8e5c60719314";
         public override string ProficiencyVedGuid => "c9eb1d3f-8da0-b1c2-fe40-9f6d71820425";
 
+        // --- Phase 3: second spec row "Carapace Gunner" -----------------------------------------
+        public override bool HasSecondarySpec => true;
+        public override string SecondarySpecName => "TheTurned_ArthronGunner_SpecializationDef";
+        public override string SecondaryClassTagName => "TheTurned_ArthronGunner_ClassTagDef";
+        public override string SecondarySpecDisplayName => "Carapace Gunner";
+        public override string SecondarySpecDescription => "A turned Arthron drilled as a ranged carapace gunner.";
+        public override string SecondaryIconFileName => "ArthronGunner_Spec.png";
+
+        public override string SecondaryClassTagGuid => "c1e3a5b7-2d4f-6b8c-ae90-3f1d2b4c6e80";
+        public override string SecondarySpecGuid => "d2f4b6c8-3e5a-7c9d-bf01-4a2e3c5d7f91";
+        public override string SecondaryTrackGuid => "e3a5c7d9-4f6b-8d0e-c012-5b3f4d6e8002";
+        public override string SecondaryProficiencyGuid => "f4b6d8ea-5a7c-9e1f-d123-6c4a5e7f9013";
+        public override string SecondaryProficiencyProgGuid => "a5c7e9fb-6b8d-af20-e234-7d5b6f801124";
+        public override string SecondarySpecVedGuid => "b6d8fa0c-7c9e-b031-f345-8e6c70912235";
+        public override string SecondaryProficiencyVedGuid => "c7e90b1d-8da0-c142-0456-9f7d81023346";
+
+        // --- Phase 3: rolled weapon arm slots ---------------------------------------------------
+        public override bool HasRolledArms => true;
+
         /// <summary>
         /// Resolve a basic Arthron variant: filter TacCharacterDefs by the Crabman class tag, prefer
         /// non-Elite/non-Ultra variants, order by name for a stable choice. (Same logic the original
@@ -86,6 +105,21 @@ namespace TheTurned.Monsters.Arthron
         public override void ApplyStatOverrides(TacCharacterDef clone)
         {
             // No stat overrides — clone keeps pure vanilla Arthron stats (Str 100 -> ~1120 HP).
+        }
+
+        /// <summary>
+        /// Second tree "Carapace Gunner": slot 0 = gunner proficiency; slots 1-6 = ranged/assault perks.
+        /// See <see cref="ArthronGunnerPerks"/>.
+        /// </summary>
+        public override AbilityTrackSlot[] BuildSecondaryAbilityTrack(DefRepository repo, ClassProficiencyAbilityDef proficiency)
+        {
+            return ArthronGunnerPerks.BuildTrack(repo, proficiency);
+        }
+
+        /// <summary>Discover the Arthron arm WeaponDefs + build their marker abilities (Feature 2).</summary>
+        public override void BuildArmOptions(DefRepository repo)
+        {
+            ArthronArms.BuildOptions(repo);
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)

@@ -66,6 +66,157 @@ namespace TheTurned.Core
             }
         }
 
+        /// <summary>
+        /// Idempotently create the monster's SECOND specialization (Carapace Gunner for Arthron): its own
+        /// <see cref="ClassTagDef"/>, a Sniper-cloned <see cref="SpecializationDef"/> with a 7-slot gunner
+        /// track + proficiency, registered into SharedData. No-op (returns true) for monsters without a 2nd
+        /// tree. The unit gets this tree automatically because the recruiter appends the secondary class tag
+        /// to the clone's Data.GameTags (the generator maps a 2nd spec-tagged tag to SecondarySpecDef).
+        /// </summary>
+        internal static bool EnsureSecondaryClass(DefRepository repo, ITurnedMonster monster)
+        {
+            if (repo == null || monster == null || !monster.HasSecondarySpec)
+            {
+                return true;
+            }
+            try
+            {
+                ClassTagDef classTag = Tags.EnsureSecondaryClassTag(repo, monster);
+                SpecializationDef spec = GetOrCreateSecondarySpec(repo, monster, classTag);
+                if (classTag == null || spec == null)
+                {
+                    Log?.LogWarning($"[TheTurned] Secondary class creation incomplete for '{monster.Id}'.");
+                    return false;
+                }
+                DefUtils.RegisterSpecInSharedData(spec);
+                Log?.LogInfo($"[TheTurned] Secondary class ready for '{monster.Id}': classTag='{classTag.name}', spec='{spec.name}'.");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Log?.LogError($"[TheTurned] Secondary class creation failed for '{monster.Id}': {e}");
+                return false;
+            }
+        }
+
+        private static SpecializationDef GetOrCreateSecondarySpec(DefRepository repo, ITurnedMonster monster, ClassTagDef classTag)
+        {
+            if (repo.GetDef(monster.SecondarySpecGuid) is SpecializationDef existing)
+            {
+                return existing;
+            }
+            SpecializationDef sniperSpec = repo.GetDef(SniperSpecGuid) as SpecializationDef;
+            if (sniperSpec == null)
+            {
+                Log?.LogError($"[TheTurned] Sniper spec '{SniperSpecGuid}' not found — cannot clone 2nd spec for '{monster.Id}'.");
+                return null;
+            }
+            SpecializationDef spec = repo.CreateDef<SpecializationDef>(monster.SecondarySpecGuid, sniperSpec);
+            if (spec == null)
+            {
+                return null;
+            }
+            spec.name = monster.SecondarySpecName;
+            spec.ResourcePath = "Defs/Common/TacUnitClasses/SpecializationDef/" + monster.SecondarySpecName;
+            spec.AchievementID = "";
+            spec.ClassTag = classTag;
+            spec.AbilityTrack = GetOrCreateSecondaryTrack(repo, monster);
+            spec.IsEliteUnit = false;
+            spec.ViewElementDef = GetOrCreateSecondarySpecVed(repo, monster, sniperSpec.ViewElementDef);
+            if (spec.ClassFilterText != null)
+            {
+                spec.ClassFilterText.LocalizationKey = monster.SecondarySpecDisplayName;
+            }
+            return spec;
+        }
+
+        private static AbilityTrackDef GetOrCreateSecondaryTrack(DefRepository repo, ITurnedMonster monster)
+        {
+            if (repo.GetDef(monster.SecondaryTrackGuid) is AbilityTrackDef existing)
+            {
+                return existing;
+            }
+            AbilityTrackDef track = repo.CreateDef<AbilityTrackDef>(monster.SecondaryTrackGuid);
+            if (track == null)
+            {
+                return null;
+            }
+            track.name = "E_AbilityTrack [" + monster.SecondarySpecName + "]";
+            track.ResourcePath = "Defs/Common/TacUnitClasses/SpecializationDef/" + monster.SecondarySpecName;
+            ClassProficiencyAbilityDef proficiency = GetOrCreateSecondaryProficiency(repo, monster);
+            track.AbilitiesByLevel = monster.BuildSecondaryAbilityTrack(repo, proficiency);
+            return track;
+        }
+
+        private static ClassProficiencyAbilityDef GetOrCreateSecondaryProficiency(DefRepository repo, ITurnedMonster monster)
+        {
+            if (repo.GetDef(monster.SecondaryProficiencyGuid) is ClassProficiencyAbilityDef existing)
+            {
+                return existing;
+            }
+            ClassProficiencyAbilityDef sniperProf = repo.GetDef(SniperProficiencyGuid) as ClassProficiencyAbilityDef;
+            if (sniperProf == null)
+            {
+                Log?.LogError($"[TheTurned] Sniper proficiency '{SniperProficiencyGuid}' not found for '{monster.Id}' 2nd tree.");
+                return null;
+            }
+            ClassProficiencyAbilityDef prof = repo.CreateDef<ClassProficiencyAbilityDef>(monster.SecondaryProficiencyGuid, sniperProf);
+            if (prof == null)
+            {
+                return null;
+            }
+            prof.name = $"TheTurned_{monster.Id}_GunnerProficiency_AbilityDef";
+            prof.CharacterProgressionData = repo.CreateDef<AbilityCharacterProgressionDef>(
+                monster.SecondaryProficiencyProgGuid, sniperProf.CharacterProgressionData);
+            if (prof.CharacterProgressionData != null)
+            {
+                prof.CharacterProgressionData.name = "E_CharacterProgressionData [" + prof.name + "]";
+            }
+            prof.ViewElementDef = GetOrCreateSecondaryProficiencyVed(repo, monster, sniperProf.ViewElementDef);
+            ClassTagDef classTag = Tags.GetSecondaryClassTag(repo, monster);
+            prof.ClassTags = new GameTagsList(new GameTagDef[] { classTag });
+            prof.AbilityDefs = new AbilityDef[0];
+            return prof;
+        }
+
+        private static ViewElementDef GetOrCreateSecondarySpecVed(DefRepository repo, ITurnedMonster monster, ViewElementDef template)
+        {
+            if (repo.GetDef(monster.SecondarySpecVedGuid) is ViewElementDef existing)
+            {
+                return existing;
+            }
+            ViewElementDef ved = repo.CreateDef<ViewElementDef>(monster.SecondarySpecVedGuid, template);
+            if (ved != null)
+            {
+                ved.name = "E_ViewElement [" + monster.SecondarySpecName + "]";
+                ved.Name = monster.SecondarySpecDisplayName;
+                ved.DisplayName1 = new LocalizedTextBind("ARTHRON_GUNNER_PROFICIENCY_NAME");
+                ved.DisplayName2 = new LocalizedTextBind(monster.SecondarySpecDisplayName, true);
+                ved.Description = new LocalizedTextBind("ARTHRON_GUNNER_PROFICIENCY_DESC");
+                Icons.TrySetSpecIcon(ved, monster.SecondaryIconFileName);
+            }
+            return ved;
+        }
+
+        private static TacticalAbilityViewElementDef GetOrCreateSecondaryProficiencyVed(DefRepository repo, ITurnedMonster monster, TacticalAbilityViewElementDef template)
+        {
+            if (repo.GetDef(monster.SecondaryProficiencyVedGuid) is TacticalAbilityViewElementDef existing)
+            {
+                return existing;
+            }
+            TacticalAbilityViewElementDef ved = repo.CreateDef<TacticalAbilityViewElementDef>(monster.SecondaryProficiencyVedGuid, template);
+            if (ved != null)
+            {
+                ved.name = $"E_ViewElement [TheTurned_{monster.Id}_GunnerProficiency_AbilityDef]";
+                ved.Name = monster.SecondarySpecDisplayName + "Proficiency";
+                ved.DisplayName1 = new LocalizedTextBind("ARTHRON_GUNNER_PROFICIENCY_NAME");
+                ved.DisplayName2 = new LocalizedTextBind(monster.SecondarySpecDisplayName, true);
+                ved.Description = new LocalizedTextBind("ARTHRON_GUNNER_PROFICIENCY_DESC");
+                Icons.TrySetAbilityIcon(ved, monster.SecondaryIconFileName);
+            }
+            return ved;
+        }
+
         private static SpecializationDef GetOrCreateSpec(DefRepository repo, ITurnedMonster monster, ClassTagDef classTag)
         {
             if (repo.GetDef(monster.SpecGuid) is SpecializationDef existing)
@@ -186,6 +337,7 @@ namespace TheTurned.Core
                 ved.DisplayName1 = new LocalizedTextBind(nameLocKey);
                 ved.DisplayName2 = new LocalizedTextBind(monster.SpecDisplayName, true);
                 ved.Description = new LocalizedTextBind(descLocKey);
+                Icons.TrySetAbilityIcon(ved, monster.IconFileName);
             }
             return ved;
         }

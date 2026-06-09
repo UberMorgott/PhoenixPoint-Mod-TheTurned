@@ -37,5 +37,36 @@ namespace TheTurned.Core
         public virtual string SpecDisplayName => Id;
         public virtual string SpecDescription => $"A turned Pandoran {Id}.";
         public virtual string IconFileName => null;
+
+        // --- Phase 3: second spec row — defaults no-op (monsters without a 2nd tree) -------------
+        public virtual bool HasSecondarySpec => false;
+
+        public virtual string SecondarySpecName => $"TheTurned_{Id}Secondary_SpecializationDef";
+        public virtual string SecondarySpecDisplayName => Id + " (2)";
+        public virtual string SecondarySpecDescription => $"A turned Pandoran {Id} (second tree).";
+        public virtual string SecondaryIconFileName => null;
+
+        public virtual string SecondaryClassTagName => $"TheTurned_{Id}Secondary_ClassTagDef";
+        public virtual string SecondaryClassTagGuid => null;
+        public virtual string SecondarySpecGuid => null;
+        public virtual string SecondaryTrackGuid => null;
+        public virtual string SecondaryProficiencyGuid => null;
+        public virtual string SecondaryProficiencyProgGuid => null;
+        public virtual string SecondarySpecVedGuid => null;
+        public virtual string SecondaryProficiencyVedGuid => null;
+
+        public virtual AbilityTrackSlot[] BuildSecondaryAbilityTrack(DefRepository repo, ClassProficiencyAbilityDef proficiency)
+        {
+            // Default: just the proficiency in slot 0 (overridden by monsters with a real 2nd tree).
+            return new[] { new AbilityTrackSlot { Ability = proficiency, RequiresPrevAbility = false } };
+        }
+
+        // --- Phase 3: rolled arms — defaults no-op -----------------------------------------------
+        public virtual bool HasRolledArms => false;
+
+        public virtual void BuildArmOptions(DefRepository repo)
+        {
+            // No-op by default.
+        }
     }
 }

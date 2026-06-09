@@ -1,6 +1,7 @@
 using Base.Core;
 using Base.Defs;
 using Base.Levels;
+using PhoenixPoint.Common.Entities;
 using PhoenixPoint.Common.Entities.Characters;
 using PhoenixPoint.Common.Entities.GameTags;
 using PhoenixPoint.Common.Entities.GameTagsTypes;
@@ -10,7 +11,11 @@ using PhoenixPoint.Geoscape.Levels;
 using PhoenixPoint.Geoscape.Levels.Factions;
 using PhoenixPoint.Modding;
 using PhoenixPoint.Tactical.Entities;
+using PhoenixPoint.Tactical.Entities.Abilities;
+using PhoenixPoint.Tactical.Entities.Equipments;
+using PhoenixPoint.Tactical.Entities.Weapons;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace TheTurned.Core
@@ -62,12 +67,24 @@ namespace TheTurned.Core
                 // 3. Build a descriptor from the live template (bodyparts/equipment/inventory copied).
                 GeoUnitDescriptor descriptor = geo.CharacterGenerator.GenerateUnit(geo.PhoenixFaction, template);
 
+                // 3b. Phase 3: roll the right/left arm + bake the rolled arms and the two arm-marker
+                //     personal abilities into the descriptor (so the personal track = 2 markers + 2 vanilla).
+                RollArmsIntoDescriptor(monster, descriptor);
+
                 // 4. Spawn the GeoCharacter (registers in the level's unit list).
                 GeoCharacter geoChar = descriptor.SpawnAsCharacter();
                 if (geoChar == null)
                 {
                     Log?.LogError($"[TheTurned] SpawnAsCharacter returned null for '{monster.Id}' — recruit aborted.");
                     return;
+                }
+
+                // 4b. Phase 3: ensure the second spec wired (auto via tags; fallback explicit), then attach
+                //     the arm-follow hook and re-derive the physical arms once.
+                WireSecondarySpecIfMissing(monster, geoChar);
+                if (monster.HasRolledArms)
+                {
+                    ArmFollowHook.Subscribe(geoChar);
                 }
 
                 // 5. Route into the Phoenix roster via the native grant path (GiveUnits -> AddRecruit).
@@ -132,6 +149,17 @@ namespace TheTurned.Core
             GameTagDef marker = Tags.EnsureMarker(repo);
             DefUtils.AppendDataGameTag(clone, classTag);
             DefUtils.AppendDataGameTag(clone, marker);
+            // Phase 3: append the SECONDARY class tag too. The generator maps the first spec-tagged tag to
+            // the primary spec and any subsequent spec-tagged tag to SecondarySpecDef (FactionCharacter
+            // Generator.GenerateUnit), so the 2nd "Carapace Gunner" tree auto-wires on spawn.
+            if (monster.HasSecondarySpec)
+            {
+                ClassTagDef secondaryTag = Tags.GetSecondaryClassTag(repo, monster);
+                if (secondaryTag != null)
+                {
+                    DefUtils.AppendDataGameTag(clone, secondaryTag);
+                }
+            }
             DefUtils.ResetClassTagsCache(clone);
 
             // Balance the cloned template (Strength/Will/Speed -> derived HP/WP/AP).
@@ -141,6 +169,129 @@ namespace TheTurned.Core
                 + $"LevelProgression from '{borrowed.name}', classTag='{classTag?.name}', marker='{marker?.name}', "
                 + $"stats Str={clone.Data.Strength} Will={clone.Data.Will} Speed={clone.Data.Speed}.");
             return clone;
+        }
+
+        /// <summary>
+        /// Phase 3 — Feature 2 recruit-time roll. Picks one right + one left arm option and bakes the result
+        /// into the descriptor BEFORE spawn:
+        ///  - <c>descriptor.ArmorItems</c>: swap the existing right/left arm bodypart WeaponDefs for the rolled ones.
+        ///  - <c>descriptor.Progression.PersonalAbilities</c>: keep at most 2 vanilla rolled perks (the human
+        ///    pool) + inject the two arm-marker abilities → exactly 4 personal slots (2 markers + 2 vanilla),
+        ///    matching the user spec. Markers are ordinary personal-track abilities so PerkOracle can swap them.
+        /// No-op for monsters without rolled arms or when no arm options were discovered.
+        /// </summary>
+        private static void RollArmsIntoDescriptor(ITurnedMonster monster, GeoUnitDescriptor descriptor)
+        {
+            if (monster == null || !monster.HasRolledArms || descriptor == null || !ArthronArms.HasOptions)
+            {
+                return;
+            }
+            try
+            {
+                ArthronArms.Roll(out ArthronArms.ArmOption right, out ArthronArms.ArmOption left);
+
+                // 1) Arm bodypart items on the descriptor (WeaponDef : TacticalItemDef).
+                if (descriptor.ArmorItems != null)
+                {
+                    if (right?.Weapon != null)
+                    {
+                        ReplaceArm(descriptor.ArmorItems, ArthronArms.RightHandToken, right.Weapon);
+                    }
+                    if (left?.Weapon != null)
+                    {
+                        ReplaceArm(descriptor.ArmorItems, ArthronArms.LeftHandToken, left.Weapon);
+                    }
+                }
+
+                // 2) Personal-track abilities: at most 2 vanilla + the 2 arm markers.
+                GeoUnitDescriptor.ProgressionDescriptor prog = descriptor.Progression;
+                if (prog?.PersonalAbilities != null)
+                {
+                    List<PassiveModifierAbilityDef> markers = new List<PassiveModifierAbilityDef>();
+                    if (right?.Marker != null) markers.Add(right.Marker);
+                    if (left?.Marker != null) markers.Add(left.Marker);
+                    InjectMarkersKeepTwoVanilla(prog.PersonalAbilities, markers);
+                }
+
+                Log?.LogInfo($"[TheTurned] Rolled arms for '{monster.Id}': "
+                    + $"right='{right?.Weapon?.name ?? "(none)"}', left='{left?.Weapon?.name ?? "(none)"}'.");
+            }
+            catch (Exception e)
+            {
+                Log?.LogWarning($"[TheTurned] RollArmsIntoDescriptor failed: {e.Message}");
+            }
+        }
+
+        /// <summary>Remove the existing arm bodypart matching <paramref name="token"/> and add the rolled one.</summary>
+        private static void ReplaceArm(List<TacticalItemDef> armour, string token, WeaponDef newArm)
+        {
+            armour.RemoveAll(d => d != null && d.name != null && d.name.Contains(token));
+            armour.Add(newArm);
+        }
+
+        /// <summary>
+        /// Mutate the generator's personal-ability dictionary so it ends with at most 2 vanilla entries plus
+        /// the supplied marker abilities, each placed at a distinct free level key. The personal track length
+        /// equals the level-progression MaxLevel, so there are always enough free keys.
+        /// </summary>
+        private static void InjectMarkersKeepTwoVanilla(Dictionary<int, TacticalAbilityDef> personal, List<PassiveModifierAbilityDef> markers)
+        {
+            const int keepVanilla = 2;
+            // Trim vanilla rolls down to the first `keepVanilla` (by level key order).
+            List<int> vanillaKeys = personal.Keys.OrderBy(k => k).ToList();
+            for (int i = keepVanilla; i < vanillaKeys.Count; i++)
+            {
+                personal.Remove(vanillaKeys[i]);
+            }
+
+            // Place each marker at the lowest free non-negative key.
+            int nextKey = 0;
+            foreach (PassiveModifierAbilityDef marker in markers)
+            {
+                if (marker == null)
+                {
+                    continue;
+                }
+                while (personal.ContainsKey(nextKey))
+                {
+                    nextKey++;
+                }
+                personal[nextKey] = marker;
+                nextKey++;
+            }
+        }
+
+        /// <summary>
+        /// Phase 3 — Feature 1 safety net. The second spec normally auto-wires (the clone carries two
+        /// spec-mapped class tags → generator sets SecondarySpecDef → GenerateProgression calls
+        /// AddSecondaryClass). If a save / generator path didn't, add it explicitly (guarded: AddSecondaryClass
+        /// throws if a secondary is already set).
+        /// </summary>
+        private static void WireSecondarySpecIfMissing(ITurnedMonster monster, GeoCharacter geoChar)
+        {
+            if (monster == null || !monster.HasSecondarySpec || geoChar?.Progression == null)
+            {
+                return;
+            }
+            try
+            {
+                if (geoChar.Progression.SecondarySpecDef != null)
+                {
+                    Log?.LogInfo($"[TheTurned] '{monster.Id}' secondary spec auto-wired ('{geoChar.Progression.SecondarySpecDef.name}').");
+                    return;
+                }
+                DefRepository repo = DefUtils.Repo;
+                SpecializationDef secondary = repo?.GetDef(monster.SecondarySpecGuid) as SpecializationDef;
+                if (secondary != null && secondary != geoChar.Progression.MainSpecDef)
+                {
+                    geoChar.Progression.AddSecondaryClass(secondary);
+                    Log?.LogInfo($"[TheTurned] '{monster.Id}' secondary spec wired via explicit fallback ('{secondary.name}').");
+                }
+            }
+            catch (Exception e)
+            {
+                Log?.LogWarning($"[TheTurned] WireSecondarySpecIfMissing failed: {e.Message}");
+            }
         }
     }
 }

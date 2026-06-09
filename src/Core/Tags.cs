@@ -76,5 +76,35 @@ namespace TheTurned.Core
             }
             return repo.GetDef(monster.ClassTagGuid) as ClassTagDef;
         }
+
+        /// <summary>Idempotently get-or-create a per-monster SECONDARY <see cref="ClassTagDef"/> (Phase 3).</summary>
+        internal static ClassTagDef EnsureSecondaryClassTag(DefRepository repo, ITurnedMonster monster)
+        {
+            if (repo == null || monster == null || string.IsNullOrEmpty(monster.SecondaryClassTagGuid))
+            {
+                return null;
+            }
+            if (repo.GetDef(monster.SecondaryClassTagGuid) is ClassTagDef existing)
+            {
+                return existing;
+            }
+            ClassTagDef tag = repo.CreateDef<ClassTagDef>(monster.SecondaryClassTagGuid);
+            if (tag != null)
+            {
+                tag.name = monster.SecondaryClassTagName;
+                tag.ResourcePath = "Defs/GameTags/Classes/" + monster.SecondaryClassTagName;
+            }
+            return tag;
+        }
+
+        /// <summary>Look up the per-monster secondary class tag.</summary>
+        internal static ClassTagDef GetSecondaryClassTag(DefRepository repo, ITurnedMonster monster)
+        {
+            if (repo == null || monster == null || string.IsNullOrEmpty(monster.SecondaryClassTagGuid))
+            {
+                return null;
+            }
+            return repo.GetDef(monster.SecondaryClassTagGuid) as ClassTagDef;
+        }
     }
 }
