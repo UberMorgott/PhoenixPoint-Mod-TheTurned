@@ -29,7 +29,7 @@ namespace TheTurned.Core
         /// </summary>
         internal static void ScanAndSubscribe(GeoLevelController geo)
         {
-            if (geo?.PhoenixFaction == null || !ArthronArms.HasOptions)
+            if (geo?.PhoenixFaction == null || !Phase4.Enabled || !CrabmanParts.HasSets)
             {
                 return;
             }
@@ -60,9 +60,9 @@ namespace TheTurned.Core
             if (_subscribed.Add(prog))
             {
                 // Capture the GeoCharacter; re-derive on any ability add (arm-marker or not — guarded inside).
-                prog.OnAbilityAdded += _ => ArthronArms.ApplyRolledArms(geoChar);
+                prog.OnAbilityAdded += _ => ArthronArms.ApplyChosenSets(geoChar);
             }
-            ArthronArms.ApplyRolledArms(geoChar);
+            ArthronArms.ApplyChosenSets(geoChar);
         }
 
         private static bool IsTurnedArthron(GeoCharacter geoChar)

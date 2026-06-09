@@ -70,18 +70,17 @@ namespace TheTurned
 
         public override void OnLevelStart(Level level)
         {
-            // Arm-follow hook DISABLED along with the arm roll (rolled hand WeaponDefs lacked compatible arm
-            // BodyPartDefs → 22k addon-attach errors). Nothing to keep in sync until arms return.
-            // Phase 4: arm choice will be reimplemented via mutoid-style progression (see design doc).
-            // if (level != null && level.name != null && level.name.Contains("Home"))
-            // {
-            //     GeoLevelController geo = level.GetComponent<GeoLevelController>();
-            //     if (geo != null)
-            //     {
-            //         ArmFollowHook.ScanAndSubscribe(geo);
-            //         Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
-            //     }
-            // }
+            // Phase 4: arm-follow hook re-enabled — swaps are now matched bodypart+hand SETs (C3), which
+            // fixes the old hand-only-swap 22k addon-attach errors. Gated inside on Phase4.Enabled + HasSets.
+            if (level != null && level.name != null && level.name.Contains("Home"))
+            {
+                GeoLevelController geo = level.GetComponent<GeoLevelController>();
+                if (geo != null)
+                {
+                    ArmFollowHook.ScanAndSubscribe(geo);
+                    Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
+                }
+            }
         }
 
         public override void OnLevelEnd(Level level)

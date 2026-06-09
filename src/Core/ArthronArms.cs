@@ -130,6 +130,7 @@ namespace TheTurned.Core
         /// actually changes. If a side has no marker present (e.g. swapped out for a non-arm perk), that
         /// side's current physical arm is left untouched (a unit always has two arms).
         /// </summary>
+        [Obsolete("hand-only swap; use ApplyChosenSets")]
         internal static void ApplyRolledArms(GeoCharacter geoChar)
         {
             if (geoChar?.Progression == null || !_built)
@@ -208,6 +209,86 @@ namespace TheTurned.Core
             {
                 Log?.LogWarning($"[TheTurned] ApplyRolledArms failed: {e.Message}");
             }
+        }
+
+        /// <summary>Re-derive desired matched SETs (right arm / left arm / head) from learned Phase-4 marker abilities
+        /// and apply via ONE SetItems call. Single source of truth = learned markers. C3: bodypart+hand together.</summary>
+        internal static void ApplyChosenSets(GeoCharacter geoChar)
+        {
+            try
+            {
+                if (geoChar?.Progression == null || !CrabmanParts.HasSets)
+                {
+                    return;
+                }
+                MatchedSet wantRight = null, wantLeft = null, wantHead = null;
+                WeaponDef clawOverride = null; // claw row: cloned claw weapon replaces the default right set's hand
+                foreach (TacticalAbilityDef ability in EnumerateArmMarkers(geoChar.Progression))
+                {
+                    if (ability == null)
+                    {
+                        continue;
+                    }
+                    if (Phase4Markers.TryGetArmSet(ability, out MatchedSet set))
+                    {
+                        if (set.IsRight) { wantRight = set; } else { wantLeft = set; }
+                    }
+                    else if (Phase4Markers.TryGetHeadSet(ability, out MatchedSet head))
+                    {
+                        wantHead = head;
+                    }
+                    else if (Phase4Markers.TryGetClawWeapon(ability, out WeaponDef claw))
+                    {
+                        clawOverride = claw;
+                    }
+                }
+                if (clawOverride != null && wantRight == null)
+                {
+                    wantRight = CrabmanParts.DefaultRight;
+                }
+
+                var newList = new List<GeoItem>(geoChar.ArmourItems);
+                bool changed = false;
+                changed |= SwapSet(newList, "Crabman_RightHand", "Crabman_RightArm", wantRight,
+                                   clawOverride != null && wantRight == CrabmanParts.DefaultRight ? clawOverride : wantRight?.Hand);
+                changed |= SwapSet(newList, "Crabman_LeftHand", "Crabman_LeftArm", wantLeft, wantLeft?.Hand);
+                changed |= SwapSet(newList, "Crabman_Head", "Crabman_Head", wantHead, wantHead?.Hand);
+                if (changed)
+                {
+                    geoChar.SetItems(armour: newList);
+                    Log?.LogInfo($"[TheTurned] ApplyChosenSets for '{geoChar.GetName()}': "
+                        + $"R='{wantRight?.Token}' L='{wantLeft?.Token}' H='{wantHead?.Token}' claw='{clawOverride?.name}'");
+                }
+            }
+            catch (Exception e)
+            {
+                Log?.LogWarning("[TheTurned] ApplyChosenSets failed: " + e);
+            }
+        }
+
+        /// <summary>Replace BOTH items of a side with the desired set. desired == null -> side untouched (never strip unchosen).</summary>
+        private static bool SwapSet(List<GeoItem> items, string handToken, string bodyToken, MatchedSet desired, WeaponDef handOverride)
+        {
+            if (desired == null)
+            {
+                return false;
+            }
+            WeaponDef hand = handOverride ?? desired.Hand;
+            bool already = items.Any(i => i?.ItemDef != null && i.ItemDef.Guid == desired.BodyPart.Guid)
+                        && (hand == null || items.Any(i => i?.ItemDef != null && i.ItemDef.Guid == hand.Guid));
+            if (already)
+            {
+                return false;
+            }
+            items.RemoveAll(i => i?.ItemDef?.name != null &&
+                (i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0
+              || (i.ItemDef.name.IndexOf(bodyToken, StringComparison.OrdinalIgnoreCase) >= 0 && !(i.ItemDef is WeaponDef))));
+            items.Add(new GeoItem(desired.BodyPart));
+            if (hand != null)
+            {
+                items.Add(new GeoItem(hand));
+            }
+            return true;
         }
 
         /// <summary>Yield every arm-marker ability present in the personal track slots + the learned set.</summary>
