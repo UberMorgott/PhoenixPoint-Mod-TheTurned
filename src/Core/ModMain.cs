@@ -14,7 +14,7 @@ namespace TheTurned
     /// On enable it: registers all monsters (<see cref="MonsterRegistry"/>), builds each monster's
     /// class/spec generically via <see cref="TurnedClassFactory"/>, applies the shared CheckIsHuman
     /// Harmony patch ONCE, and attaches the input-poller MonoBehaviour to the live mod GameObject (ModGO).
-    /// On every geoscape ("Home") unload it re-applies the classes (Officer-style) for persistence, since
+    /// On every level unload it re-applies the classes (Officer-style, idempotent) for persistence, since
     /// other mods (e.g. TFTV) re-inject defs on geoscape load.
     /// </summary>
     public class TheTurnedMain : ModMain
@@ -78,33 +78,34 @@ namespace TheTurned
         {
             // Phase 4: arm-follow hook re-enabled — swaps are now matched bodypart+hand SETs (C3), which
             // fixes the old hand-only-swap 22k addon-attach errors. Gated inside on Phase4.Enabled + HasSets.
-            if (level != null && level.name != null && level.name.Contains("Home"))
+            // Geoscape detection = GeoLevelController component presence, NOT level.name: the level
+            // literally named "Home" is the MAIN MENU, so the old name gate never matched the real
+            // geoscape (FeedRows/ScanAndSubscribe never ran — zero 'FeedRows:' lines in 41MB of logs).
+            GeoLevelController geo = level != null ? level.GetComponent<GeoLevelController>() : null;
+            if (geo != null)
             {
-                GeoLevelController geo = level.GetComponent<GeoLevelController>();
-                if (geo != null)
+                ArmFollowHook.ScanAndSubscribe(geo);
+                // Phase-4: feed the popup spec ROWS into the faction list (no-op when TFTV absent).
+                SpecRowFactory.FeedRows(geo);
+                // Log only when ScanAndSubscribe actually ran (same gate it no-ops on internally),
+                // so V1 log reading isn't confused when Phase 4 is disabled.
+                if (Phase4.Enabled && CrabmanParts.HasSets)
                 {
-                    ArmFollowHook.ScanAndSubscribe(geo);
-                    // Phase-4: feed the popup spec ROWS into the faction list (no-op when TFTV absent).
-                    SpecRowFactory.FeedRows(geo);
-                    // Log only when ScanAndSubscribe actually ran (same gate it no-ops on internally),
-                    // so V1 log reading isn't confused when Phase 4 is disabled.
-                    if (Phase4.Enabled && CrabmanParts.HasSets)
-                    {
-                        Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
-                    }
+                    Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
                 }
             }
         }
 
         public override void OnLevelEnd(Level level)
         {
-            // Re-apply classes when leaving the geoscape ("Home"), Officer-style, so they survive
-            // other mods re-injecting defs on the next geoscape load. Idempotent (GetDef-guarded).
-            if (level != null && level.name != null && level.name.Contains("Home"))
-            {
-                BuildAllClasses();
-                Logger.LogInfo("[TheTurned] Classes re-applied on geoscape unload (Home).");
-            }
+            // Re-apply classes on EVERY level unload, Officer-style, so they survive other mods
+            // re-injecting defs on the next geoscape load. Unconditional on purpose: BuildAllClasses
+            // is idempotent get-or-create (cheap GetDef hits once defs exist), and the old "Home"
+            // name gate actually fired on MAIN-MENU unload (accidental but correct pre-geoscape
+            // timing, incl. after save-load) — unconditional keeps that AND covers geoscape/tactical
+            // unloads without needing a second GetComponent probe.
+            BuildAllClasses();
+            Logger.LogInfo($"[TheTurned] Classes re-applied on level unload ('{level?.name}').");
         }
 
         private void BuildAllClasses()
