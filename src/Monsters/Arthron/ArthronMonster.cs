@@ -21,11 +21,6 @@ namespace TheTurned.Monsters.Arthron
     /// </summary>
     internal sealed class ArthronMonster : TurnedMonsterBase
     {
-        // --- balance (see ApplyStatOverrides for the MaxHP rationale) ---------------------------
-        internal const int ArthronStrength = 20; // Strength == Endurance; drives MaxHP.
-        internal const int ArthronWill = 18;
-        internal const int ArthronSpeed = 12;
-
         private const string CrabmanClassTagName = "Crabman_ClassTagDef";
 
         public override string Id => "Arthron";
@@ -34,6 +29,9 @@ namespace TheTurned.Monsters.Arthron
         // Display metadata (preserved from the original ViewElementDef text).
         public override string SpecDisplayName => "Arthron";
         public override string SpecDescription => "A turned Pandoran Arthron.";
+
+        // Class/spec icon (256x256 RGBA PNG deployed to Assets\Textures).
+        public override string IconFileName => "Arthron_Spec.png";
 
         // --- preserved stable GUIDs -------------------------------------------------------------
         // Cloned, progression-bearing Arthron def (was ArthronRecruiter.ProgressedArthronGuid).
@@ -85,24 +83,9 @@ namespace TheTurned.Monsters.Arthron
             return ArthronPerks.BuildTrack(repo, proficiency);
         }
 
-        /// <summary>
-        /// Heavy bruiser, but fair. Strength == Endurance and drives MaxHP via the shared formula:
-        ///   MaxHP = TacticalActorBaseDef.Toughness + Strength * EnduranceToHealthMultiplier(10).
-        /// The Arthron's observed Toughness is 120 (Strength 100 -> 1120 HP in-game), so Strength 20 ->
-        /// 120 + 20*10 = 320 HP — tanky, not the vanilla 1120. Toughness / the multiplier live on the
-        /// SHARED TacticalActorBaseDef and are deliberately NOT mutated (that would flip all Arthrons).
-        /// ActionPoints derive from Speed; max WillPoints == Will. Armour aggregates from the chitin
-        /// bodypart items and is intentionally left as-is.
-        /// </summary>
         public override void ApplyStatOverrides(TacCharacterDef clone)
         {
-            if (clone?.Data == null)
-            {
-                return;
-            }
-            clone.Data.Strength = ArthronStrength; // -> ~320 MaxHP with Toughness 120
-            clone.Data.Will = ArthronWill;
-            clone.Data.Speed = ArthronSpeed;
+            // No stat overrides — clone keeps pure vanilla Arthron stats (Str 100 -> ~1120 HP).
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)

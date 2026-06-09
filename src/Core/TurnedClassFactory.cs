@@ -180,9 +180,12 @@ namespace TheTurned.Core
             {
                 ved.name = $"E_ViewElement [TheTurned_{monster.Id}_ClassProficiency_AbilityDef]";
                 ved.Name = monster.SpecDisplayName + "Proficiency";
-                ved.DisplayName1 = new LocalizedTextBind(monster.SpecDisplayName + " Proficiency", true);
+                // Localized name/description via CSV keys (e.g. ARTHRON_PROFICIENCY_NAME/_DESC).
+                string nameLocKey = monster.Id.ToUpperInvariant() + "_PROFICIENCY_NAME";
+                string descLocKey = monster.Id.ToUpperInvariant() + "_PROFICIENCY_DESC";
+                ved.DisplayName1 = new LocalizedTextBind(nameLocKey);
                 ved.DisplayName2 = new LocalizedTextBind(monster.SpecDisplayName, true);
-                ved.Description = new LocalizedTextBind(monster.SpecDescription, true);
+                ved.Description = new LocalizedTextBind(descLocKey);
             }
             return ved;
         }
