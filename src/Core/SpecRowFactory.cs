@@ -134,6 +134,10 @@ namespace TheTurned.Core
             }
             track.name = $"TheTurned_ArthronRow_{rowKey}_AbilityTrackDef";
             track.ResourcePath = "Defs/Common/TacUnitClasses/AbilityTrackDef/" + track.name;
+            // Rows stay RowLength (7), NOT maxLevel+1: only tracks in character.Progression.AbilityTracks
+            // pass through MutoidAbilityTrackContainerElement.GetAbilitySlotForLevel (slots[maxLevel],
+            // needs 8). Row tracks render solely in SpecializedAbilityTrackPopupElement.Init:122, which
+            // reads AbilitiesByLevel.Where(Ability != null) indexed [0..maxLevel) — 7 non-null cells.
             track.AbilitiesByLevel = PadRow(repo, rowKey, cells, RowLength, fillerIcon, fillerNameLocKey, fillerDescLocKey);
             return track;
         }

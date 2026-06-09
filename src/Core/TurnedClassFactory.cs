@@ -135,6 +135,15 @@ namespace TheTurned.Core
         {
             if (repo.GetDef(monster.SecondaryTrackGuid) is AbilityTrackDef existing)
             {
+                // Same-session stale-def guard: a 7-slot secondary created before the reshape below
+                // would crash MutoidAbilityTrackContainerElement.GetAbilitySlotForLevel (indexes
+                // slots[maxLevel]). ReshapeWithSpacer passes already-8-slot arrays through (idempotent).
+                if (Phase4.Enabled && existing.AbilitiesByLevel != null
+                    && existing.AbilitiesByLevel.Length < SpecRowFactory.RowLength + 1)
+                {
+                    existing.AbilitiesByLevel = SpecRowFactory.ReshapeWithSpacer(existing.AbilitiesByLevel,
+                        totalLength: SpecRowFactory.RowLength + 1, spacerIndex: SpecRowFactory.SpacerIndex);
+                }
                 return existing;
             }
             AbilityTrackDef track = repo.CreateDef<AbilityTrackDef>(monster.SecondaryTrackGuid);
@@ -146,6 +155,15 @@ namespace TheTurned.Core
             track.ResourcePath = "Defs/Common/TacUnitClasses/SpecializationDef/" + monster.SecondarySpecName;
             ClassProficiencyAbilityDef proficiency = GetOrCreateSecondaryProficiency(repo, monster);
             track.AbilitiesByLevel = monster.BuildSecondaryAbilityTrack(repo, proficiency);
+            // Same quirk as the primary track (GetOrCreateTrack): EVERY track the character carries is
+            // rendered by MutoidAbilityTrackContainerElement, whose GetAbilitySlotForLevel loops
+            // i <= maxLevel and indexes slots[maxLevel] (decompile :78-97) — a 7-slot secondary throws
+            // IndexOutOfRange, aborting RefreshAbilityTracks (every cell left uninitialized/unclickable).
+            if (Phase4.Enabled)
+            {
+                track.AbilitiesByLevel = SpecRowFactory.ReshapeWithSpacer(track.AbilitiesByLevel,
+                    totalLength: SpecRowFactory.RowLength + 1, spacerIndex: SpecRowFactory.SpacerIndex);
+            }
             return track;
         }
 
