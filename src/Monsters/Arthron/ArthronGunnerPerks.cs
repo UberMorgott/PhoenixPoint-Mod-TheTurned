@@ -161,7 +161,7 @@ namespace TheTurned.Monsters.Arthron
                 SpotterGuid, "TheTurned_Arthron_SpotterEyes_AbilityDef",
                 SpotterProgGuid, SpotterVedGuid,
                 "ARTHRON_SPOTTER_NAME", "ARTHRON_SPOTTER_DESC", "ArthronGunner_Spotter.png",
-                skillPointCost: 25, mutagenCost: 25,
+                skillPointCost: 25, mutagenCost: 20,
                 new[]
                 {
                     PerkFactory.Add(StatModificationTarget.Perception, Spotter_Perception),
@@ -176,7 +176,7 @@ namespace TheTurned.Monsters.Arthron
                 OverwatchCarapaceGuid, "TheTurned_Arthron_OverwatchCarapace_AbilityDef",
                 OverwatchCarapaceProgGuid, OverwatchCarapaceVedGuid,
                 "ARTHRON_OVERWATCHCARAPACE_NAME", "ARTHRON_OVERWATCHCARAPACE_DESC", "ArthronGunner_OverwatchCarapace.png",
-                skillPointCost: 30, mutagenCost: 30,
+                skillPointCost: 30, mutagenCost: 25,
                 new[]
                 {
                     PerkFactory.Add(StatModificationTarget.Accuracy, OverwatchCarapace_Accuracy),

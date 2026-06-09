@@ -180,7 +180,7 @@ namespace TheTurned.Monsters.Arthron
                 ChitinPlatingGuid, "TheTurned_Arthron_ChitinPlating_AbilityDef",
                 ChitinPlatingProgGuid, ChitinPlatingVedGuid,
                 "ARTHRON_CHITINPLATING_NAME", "ARTHRON_CHITINPLATING_DESC", "Arthron_ChitinPlating.png",
-                skillPointCost: 20, mutagenCost: 20,
+                skillPointCost: 20, mutagenCost: 15,
                 new[]
                 {
                     PerkFactory.Add(StatModificationTarget.Armour, ChitinPlating_Armour),
@@ -215,7 +215,7 @@ namespace TheTurned.Monsters.Arthron
                 RegenerationGuid, "TheTurned_Arthron_HardenedHide_AbilityDef",
                 RegenerationProgGuid, RegenerationVedGuid,
                 "ARTHRON_REGENERATION_NAME", "ARTHRON_REGENERATION_DESC", "Arthron_HardenedHide.png",
-                skillPointCost: 25, mutagenCost: 25,
+                skillPointCost: 25, mutagenCost: 15,
                 new[] { PerkFactory.Add(StatModificationTarget.Endurance, Regeneration_Endurance) });
         }
 
