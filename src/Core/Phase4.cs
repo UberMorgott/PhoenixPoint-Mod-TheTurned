@@ -40,8 +40,8 @@ namespace TheTurned.Core
             }
         }
 
-        /// <summary>Marked recruited Arthron + Phase-4 on.</summary>
-        internal static bool IsPhase4Arthron(GeoCharacter character)
+        /// <summary>Any marked turned recruit (shared marker tag, all monster classes) + Phase-4 on.</summary>
+        internal static bool IsPhase4Recruit(GeoCharacter character)
         {
             if (!Enabled || character == null)
             {

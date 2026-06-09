@@ -8,7 +8,7 @@ Self-contained dev reference so this repo alone bootstraps a new session. The *f
 
 ## What the mod does
 
-Grants a copy of the game's enemy **Arthron** (internal codename *Crabman*) to the Phoenix faction at runtime, classified as a playable **soldier** with a balanced stat block and a real 7-slot Arthron perk tree. Triggered by **Ctrl+Shift+T** on the geoscape. Standalone (`Dependencies: []`), TFTV-safe. Target framework **.NET Framework 4.7.2**; mod ID `Morgott.TheTurned`, v0.2.0.
+Grants a copy of the game's enemy **Arthron** (internal codename *Crabman*) to the Phoenix faction at runtime, classified as a playable **soldier** with a balanced stat block and a real 7-slot Arthron perk tree. Triggered by **Ctrl+Shift+T** on the geoscape. Hard-depends on TFTV (`Dependencies: [ "phoenixrising.tftv" ]`); the Phase-4 runtime guard (`Phase4.Init`/`Phase4.Enabled`) probes the resolved dependency and falls back to the Phase-2/3 fixed track when TFTV is absent. Target framework **.NET Framework 4.7.2**; mod ID `Morgott.TheTurned`, v0.2.0.
 
 ## Architecture (Phase 2: Core + per-monster)
 
