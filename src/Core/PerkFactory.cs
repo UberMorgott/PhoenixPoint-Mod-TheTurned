@@ -137,7 +137,9 @@ namespace TheTurned.Core
             return DefUtils.AnyTemplate<PassiveModifierAbilityDef>(repo);
         }
 
-        private static AbilityCharacterProgressionDef BuildProgression(
+        /// <summary>Internal for the Phase-4 survival row: non-passive ability defs (StatusImmunity /
+        /// borrowed clones) need the same get-or-create prog data (sp + mutagen costs).</summary>
+        internal static AbilityCharacterProgressionDef BuildProgression(
             DefRepository repo, string progGuid, string abilityName, int skillPointCost, int mutagenCost)
         {
             if (repo.GetDef(progGuid) is AbilityCharacterProgressionDef existing)
@@ -174,7 +176,8 @@ namespace TheTurned.Core
             return BuildVedCore(repo, vedGuid, vedName, nameLocKey, descLocKey, iconFileName, specIconSlot: true);
         }
 
-        private static TacticalAbilityViewElementDef BuildVed(
+        /// <summary>Internal for the Phase-4 survival row (own VEDs on non-passive ability defs).</summary>
+        internal static TacticalAbilityViewElementDef BuildVed(
             DefRepository repo, string vedGuid, string abilityName, string nameLocKey, string descLocKey, string iconFileName)
         {
             return BuildVedCore(repo, vedGuid, abilityName, nameLocKey, descLocKey, iconFileName, specIconSlot: false);

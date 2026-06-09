@@ -49,6 +49,9 @@ namespace TheTurned
             // Phase-4: OR our recruits into the mutoid progression gate (no-op when TFTV absent).
             PandoranProgressionGate.Apply((Harmony)HarmonyInstance);
 
+            // Phase-4: post-mission limb auto-restore for the survival capstone (no-op when TFTV absent).
+            LimbRestoreHook.Apply((Harmony)HarmonyInstance);
+
             // Attach the hotkey poller to the mod's live GameObject (persists for mod lifetime).
             GameObject go = ModGO;
             if (go != null)

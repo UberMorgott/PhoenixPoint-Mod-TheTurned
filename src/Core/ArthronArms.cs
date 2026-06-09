@@ -295,7 +295,7 @@ namespace TheTurned.Core
 
         /// <summary>Yield every ability present in the personal track slots + the learned set. Feeds the
         /// Phase-4 marker lookups (arm SET + head SET + claw markers) and the legacy arm-marker scan.</summary>
-        private static IEnumerable<TacticalAbilityDef> EnumerateLearnedAbilities(PhoenixPoint.Common.Entities.Characters.CharacterProgression prog)
+        internal static IEnumerable<TacticalAbilityDef> EnumerateLearnedAbilities(PhoenixPoint.Common.Entities.Characters.CharacterProgression prog)
         {
             var personal = prog.PersonalAbilityTrack;
             if (personal?.AbilitiesByLevel != null)
