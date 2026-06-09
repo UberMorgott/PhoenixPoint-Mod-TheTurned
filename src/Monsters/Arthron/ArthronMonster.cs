@@ -177,8 +177,10 @@ namespace TheTurned.Monsters.Arthron
             // ROW F — Survival: immunities + limb-restore capstone. NOT gated like Arms/Claw/Head: its
             // cells resolve from repo-global StatusDefs / ability defs (not bundle-timing-sensitive
             // Crabman item defs), and each cell degrades individually (warn + PadRow filler).
+            // Runs every pass on purpose — refreshes the LimbRestoreMarker static read by LimbRestoreHook.
+            var survivalCells = ArthronSurvivalPerks.BuildRowCells(repo);
             SpecRowFactory.GetOrCreateRow(repo, "Survival", "ARTHRON_ROW_SURVIVAL", "ArthronSurvival_Regen.png",
-                classTag, ArthronSurvivalPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+                classTag, survivalCells, fillerIcon: "Arthron_Spec.png");
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)

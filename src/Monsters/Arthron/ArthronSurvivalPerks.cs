@@ -89,9 +89,16 @@ namespace TheTurned.Monsters.Arthron
                 ability.name = $"TheTurned_Arthron_Survival_{key}_AbilityDef";
             }
             ability.StatusDef = status;
-            ability.CharacterProgressionData = PerkFactory.BuildProgression(repo,
+            // Same invariant the FIRE cell enforces: the popup NREs on null prog data (cost read).
+            var prog = PerkFactory.BuildProgression(repo,
                 Phase4.DeriveGuid("survival:" + key + "|prog").ToString(),
                 ability.name, mutagenCost, mutagenCost);
+            if (prog == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] survival row: prog data build failed for '{key}' — cell skipped");
+                return;
+            }
+            ability.CharacterProgressionData = prog;
             ability.ViewElementDef = PerkFactory.BuildVed(repo,
                 Phase4.DeriveGuid("survival:" + key + "|ved").ToString(),
                 ability.name, baseLocKey + "_NAME", baseLocKey + "_DESC", icon);
@@ -155,9 +162,16 @@ namespace TheTurned.Monsters.Arthron
                 return;
             }
             clone.name = "TheTurned_Arthron_Survival_DAZE_AbilityDef";
-            clone.CharacterProgressionData = PerkFactory.BuildProgression(repo,
+            // Same invariant the FIRE cell enforces: the popup NREs on null prog data (cost read).
+            var prog = PerkFactory.BuildProgression(repo,
                 Phase4.DeriveGuid("survival:DAZE|prog").ToString(),
                 clone.name, mutagenCost, mutagenCost);
+            if (prog == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] survival row: prog data build failed for 'DAZE' — cell skipped");
+                return;
+            }
+            clone.CharacterProgressionData = prog;
             cells.Add(new AbilityTrackSlot { Ability = clone, RequiresPrevAbility = false });
         }
 

@@ -59,15 +59,26 @@ namespace TheTurned.Core
                 }
                 // ToList: RestoreBodyPart only mutates _bodypartHealth, but never enumerate a live
                 // engine collection while calling back into its owner.
+                int restored = 0;
                 foreach (GeoItem item in __instance.ArmourItems.ToList())
                 {
-                    __instance.RestoreBodyPart(item);
+                    // GetEquippedItemHealth (GeoCharacter.cs:1348) = current/total fraction, 1f when
+                    // undamaged or untracked; fresh here — ApllyTacticalResult re-aggregated the map
+                    // just before this Postfix. Skipping undamaged items avoids per-mission log spam.
+                    if (__instance.GetEquippedItemHealth(item) < 1f)
+                    {
+                        __instance.RestoreBodyPart(item);
+                        restored++;
+                    }
                 }
-                TheTurnedMain.LogInfo($"[TheTurned] limb restore: bodyparts auto-restored post-mission for '{__instance.DisplayName}'.");
+                if (restored > 0)
+                {
+                    TheTurnedMain.LogInfo($"[TheTurned] limb restore: {restored} damaged bodypart item(s) auto-restored post-mission for '{__instance.DisplayName}'.");
+                }
             }
             catch (Exception e)
             {
-                TheTurnedMain.LogWarn("[TheTurned] limb restore postfix failed: " + e.Message);
+                TheTurnedMain.LogWarn("[TheTurned] limb restore postfix failed: " + e);
             }
         }
     }
