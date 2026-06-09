@@ -152,6 +152,17 @@ namespace TheTurned.Monsters.Arthron
             {
                 TheTurnedMain.LogWarn("[TheTurned] arms row deferred — Crabman sets not resolved yet");
             }
+            // ROW D — Claw Strikes: status-on-hit claw clones. Same gating rationale as Arms: building
+            // before the base claw resolves would bake a filler-only track PERMANENTLY.
+            if (CrabmanParts.DefaultRight?.Hand != null)
+            {
+                SpecRowFactory.GetOrCreateRow(repo, "Claw", "ARTHRON_ROW_CLAW", "Arthron_CrushingClaw.png",
+                    classTag, ArthronClawPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+            }
+            else
+            {
+                TheTurnedMain.LogWarn("[TheTurned] claw row deferred — base claw weapon not resolved yet");
+            }
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)
