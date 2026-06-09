@@ -20,5 +20,5 @@
       "Value": "Modular framework to recruit turned Pandorans as Phoenix soldiers; adds the Arthron class."
     }
   ],
-  "Dependencies": []
+  "Dependencies": [ "phoenixrising.tftv" ]
 }

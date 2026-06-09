@@ -24,9 +24,14 @@ namespace TheTurned
         /// Mirror Officer: unsafe to disable (no clean revert of runtime grants).
         public override bool CanSafelyDisable => false;
 
+        /// <summary>Static log helpers (null-safe before/after enable) for code outside this class.</summary>
+        internal static void LogInfo(string message) => Main?.Logger?.LogInfo(message);
+        internal static void LogWarn(string message) => Main?.Logger?.LogWarning(message);
+
         public override void OnModEnabled()
         {
             Main = this;
+            Phase4.Init(this);
             Logger.LogInfo("[TheTurned] Enabling — Ctrl+Shift+<key> on the geoscape recruits a turned monster.");
 
             MonsterRegistry.RegisterDefaults();
