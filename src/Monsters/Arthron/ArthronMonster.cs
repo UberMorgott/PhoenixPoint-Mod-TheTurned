@@ -163,6 +163,17 @@ namespace TheTurned.Monsters.Arthron
             {
                 TheTurnedMain.LogWarn("[TheTurned] claw row deferred — base claw weapon not resolved yet");
             }
+            // ROW E — Head/Spray: native spitter set + keyword-clone variants. Gated on the SPITTER set
+            // specifically (not just HeadSets.Count) — same permanent-filler-bake rationale.
+            if (ArthronHeadPerks.FindSpitterSet() != null)
+            {
+                SpecRowFactory.GetOrCreateRow(repo, "Head", "ARTHRON_ROW_HEAD", "ArthronSpray_Acid.png",
+                    classTag, ArthronHeadPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+            }
+            else
+            {
+                TheTurnedMain.LogWarn("[TheTurned] head row deferred — Crabman spitter set not resolved yet");
+            }
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)
