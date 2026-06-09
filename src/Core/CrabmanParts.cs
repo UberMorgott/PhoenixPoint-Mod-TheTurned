@@ -96,6 +96,19 @@ namespace TheTurned.Core
                 }
                 into.Add(new MatchedSet { BodyPart = arm, Hand = hand, IsRight = isRight, Token = token });
             }
+            // Bodypart-only sets (mirror PairHeads): arm bodyparts NO hand weapon paired to. Runtime
+            // dump shows the LEFT side has 4 grenade hand weapons ONLY — the shield is a pure bodypart
+            // (Crabman_LeftArm_Shield/EliteShield_BodyPartDef, no shield WeaponDef), so hand-driven
+            // pairing alone can never produce the Shield set. Reference-guard prevents duplicating a
+            // bodypart already covered by a hand-paired set (incl. fuzzy-matched ones).
+            foreach (var bp in candidates)
+            {
+                if (into.Any(s => s.BodyPart == bp))
+                {
+                    continue;
+                }
+                into.Add(new MatchedSet { BodyPart = bp, Hand = null, IsRight = isRight, Token = VariantToken(bp.name, armPrefix) });
+            }
         }
 
         private static void PairHeads(List<WeaponDef> hands, List<TacticalItemDef> bodyparts)
@@ -103,12 +116,44 @@ namespace TheTurned.Core
             HeadSets.Clear();
             var headWeapons = hands
                 .Where(h => h.name.StartsWith("Crabman_Head", StringComparison.OrdinalIgnoreCase)).ToList();
-            foreach (var bp in bodyparts.Where(b => b.name.StartsWith("Crabman_Head", StringComparison.OrdinalIgnoreCase)))
+            var headBodyparts = bodyparts
+                .Where(b => b.name.StartsWith("Crabman_Head", StringComparison.OrdinalIgnoreCase)).ToList();
+            var pairedWeapons = new HashSet<WeaponDef>();
+            foreach (var bp in headBodyparts)
             {
                 string token = VariantToken(bp.name, "Crabman_Head");
                 // Same two-pass policy as PairSide: exact first, substring fallback only when no exact hit.
                 var weapon = headWeapons.FirstOrDefault(h => TokenExact(VariantToken(h.name, "Crabman_Head"), token))
                           ?? headWeapons.FirstOrDefault(h => TokenFuzzy(VariantToken(h.name, "Crabman_Head"), token));
+                if (weapon != null)
+                {
+                    pairedWeapons.Add(weapon);
+                }
+                HeadSets.Add(new MatchedSet { BodyPart = bp, Hand = weapon, IsRight = false, Token = token });
+            }
+            // Head WEAPONS with no token-matched bodypart. Runtime dump: head weapons are
+            // Crabman_Head_Spitter/EliteSpitter_WeaponDef, head bodyparts are ONLY
+            // Crabman_Head_Humanoid/EliteHumanoid_BodyPartDef (TFTV strings.json:4311-4312 confirms
+            // no other head bodyparts) — "Spitter" vs "Humanoid" fails exact AND fuzzy, so the
+            // spitter SETs were never created (head row stayed deferred). Grounding: a head weapon
+            // attaches into a head bodypart's addon slots (C3 matched-SET rule), and Humanoid/Elite-
+            // Humanoid are the only carriers → pair by Elite-ness (Elite weapon ↔ Elite bodypart).
+            // Non-Elite weapons first so ArthronHeadPerks.FindSpitterSet (first Hand containing
+            // "Spitter") resolves the BASIC spitter, consistent with the non-Elite defaults policy.
+            foreach (var weapon in headWeapons
+                .Where(w => !pairedWeapons.Contains(w))
+                .OrderBy(w => VariantToken(w.name, "Crabman_Head").IndexOf("Elite", StringComparison.OrdinalIgnoreCase) >= 0 ? 1 : 0))
+            {
+                string token = VariantToken(weapon.name, "Crabman_Head");
+                bool elite = token.IndexOf("Elite", StringComparison.OrdinalIgnoreCase) >= 0;
+                var bp = headBodyparts.FirstOrDefault(b =>
+                        (VariantToken(b.name, "Crabman_Head").IndexOf("Elite", StringComparison.OrdinalIgnoreCase) >= 0) == elite)
+                      ?? headBodyparts.FirstOrDefault();
+                if (bp == null)
+                {
+                    TheTurnedMain.LogWarn($"[TheTurned] no head bodypart for head weapon '{weapon.name}' — set skipped (C3)");
+                    continue;
+                }
                 HeadSets.Add(new MatchedSet { BodyPart = bp, Hand = weapon, IsRight = false, Token = token });
             }
         }
@@ -134,16 +179,30 @@ namespace TheTurned.Core
             && (a.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0
              || b.IndexOf(a, StringComparison.OrdinalIgnoreCase) >= 0);
 
+        /// <summary>Sets whose token does NOT carry "Elite" — ordinal sort otherwise puts Elite
+        /// variants first (e.g. EliteGrenade &lt; Grenade), skewing every FirstOrDefault default.</summary>
+        private static IEnumerable<MatchedSet> NonElite(IEnumerable<MatchedSet> sets)
+            => sets.Where(s => string.IsNullOrEmpty(s.Token)
+                            || s.Token.IndexOf("Elite", StringComparison.OrdinalIgnoreCase) < 0);
+
         private static void PickDefaults()
         {
-            DefaultRight = RightArmSets.FirstOrDefault(s => s.Token.IndexOf("Pincer", StringComparison.OrdinalIgnoreCase) >= 0
+            // Each default prefers the non-Elite variant first, then falls back to the full list.
+            DefaultRight = NonElite(RightArmSets).FirstOrDefault(s => s.Token.IndexOf("Pincer", StringComparison.OrdinalIgnoreCase) >= 0
+                                                                   || s.Token.IndexOf("Claw", StringComparison.OrdinalIgnoreCase) >= 0)
+                        ?? NonElite(RightArmSets).FirstOrDefault(s => s.Token.IndexOf("Gun", StringComparison.OrdinalIgnoreCase) < 0)
+                        ?? RightArmSets.FirstOrDefault(s => s.Token.IndexOf("Pincer", StringComparison.OrdinalIgnoreCase) >= 0
                                                          || s.Token.IndexOf("Claw", StringComparison.OrdinalIgnoreCase) >= 0)
                         ?? RightArmSets.FirstOrDefault(s => s.Token.IndexOf("Gun", StringComparison.OrdinalIgnoreCase) < 0)
                         ?? RightArmSets.FirstOrDefault();
-            DefaultLeft = LeftArmSets.FirstOrDefault(s => s.Token.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0)
+            DefaultLeft = NonElite(LeftArmSets).FirstOrDefault(s => s.Token.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0)
+                       ?? LeftArmSets.FirstOrDefault(s => s.Token.IndexOf("Shield", StringComparison.OrdinalIgnoreCase) >= 0)
                        ?? LeftArmSets.FirstOrDefault();
-            DefaultHead = HeadSets.FirstOrDefault(s => s.Token.IndexOf("Spitter", StringComparison.OrdinalIgnoreCase) < 0
-                                                    && s.Token.IndexOf("Humanoid", StringComparison.OrdinalIgnoreCase) < 0)
+            // Default head = the bare non-Elite head (bodypart-only set, Hand == null): the only head
+            // bodyparts are Humanoid/EliteHumanoid; the spitter sets carry a head WEAPON and are
+            // popup-row choices, not the recruit default.
+            DefaultHead = NonElite(HeadSets).FirstOrDefault(s => s.Hand == null)
+                       ?? HeadSets.FirstOrDefault(s => s.Hand == null)
                        ?? HeadSets.FirstOrDefault();
             if (DefaultRight == null || DefaultLeft == null || DefaultHead == null)
             {
