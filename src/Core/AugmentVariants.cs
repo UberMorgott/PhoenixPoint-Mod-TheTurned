@@ -55,7 +55,11 @@ namespace TheTurned.Core
         /// are authored clone bodyparts, see CrabmanParts.BuildAuthoredHeadVariants).</summary>
         internal static IEnumerable<TacticalItemDef> AllVariantBodyparts =>
             CrabmanParts.BaseTier(CrabmanParts.HeadSets)
-                .Concat(CrabmanParts.BaseTier(CrabmanParts.LeftArmSets))
+                // The plain left arm (Crabman_LeftArm_BodyPartDef, empty token) is the recruit's equipped
+                // DEFAULT — it must NOT appear as a selectable card. Left cards = {Shield, Grenade,
+                // Acid_Grenade}. Exclude the bare arm here (it stays equippable, just not a card).
+                .Concat(CrabmanParts.BaseTier(CrabmanParts.LeftArmSets)
+                    .Where(s => !string.IsNullOrEmpty(s.Token)))
                 .Concat(CrabmanParts.BaseTier(CrabmanParts.RightArmSets))
                 .Select(s => s.BodyPart).Where(b => b != null).Distinct();
 

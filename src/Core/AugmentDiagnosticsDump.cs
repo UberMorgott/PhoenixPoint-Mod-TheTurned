@@ -10,6 +10,7 @@ using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
 using System;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -120,6 +121,78 @@ namespace TheTurned.Core
             //     The user runs one in-game pass (open recruit -> DNA -> Bionics) and pastes this back so we
             //     can surface the real vanilla ability descriptions (Return Fire, Deploy Shield, Spit, ...).
             DumpCardAbilities();
+
+            // (f) APPEARANCE harvest: for every Crabman head/arm/leg/torso part the screen can touch (incl.
+            //     our authored head clones), dump the visual-identity fields so a single in-game pass reveals
+            //     which parts SHARE a model (look identical) vs are visually distinct. Feeds the body-part
+            //     catalog (docs/research/crabman-bodypart-catalog.md).
+            DumpAppearance(repo);
+        }
+
+        /// <summary>Per Crabman part: VED display/icons, BodyPartAspectDef, SkinData type, and the RuntimeKey
+        /// of every AssetReference (prefab/mesh) field — the cross-part model fingerprint.</summary>
+        private static void DumpAppearance(DefRepository repo)
+        {
+            var parts = repo.GetAllDefs<TacticalItemDef>()
+                .Where(d => d?.name != null
+                    && (d.name.IndexOf("Crabman_Head", StringComparison.OrdinalIgnoreCase) >= 0
+                     || d.name.IndexOf("Crabman_LeftArm", StringComparison.OrdinalIgnoreCase) >= 0
+                     || d.name.IndexOf("Crabman_RightArm", StringComparison.OrdinalIgnoreCase) >= 0
+                     || d.name.IndexOf("Crabman_Legs", StringComparison.OrdinalIgnoreCase) >= 0
+                     || d.name.IndexOf("Crabman_Torso", StringComparison.OrdinalIgnoreCase) >= 0))
+                .OrderBy(d => d.name, StringComparer.Ordinal).ToList();
+            TheTurnedMain.LogInfo($"[TheTurned] DUMP APPEARANCE Crabman parts ({parts.Count}):");
+            foreach (TacticalItemDef d in parts)
+            {
+                string tier = d.name.IndexOf("Ultra", StringComparison.OrdinalIgnoreCase) >= 0 ? "Ultra"
+                    : d.name.IndexOf("Elite", StringComparison.OrdinalIgnoreCase) >= 0 ? "Elite" : "Base";
+                ViewElementDef ved = d.ViewElementDef;
+                string disp = ved?.DisplayName1?.LocalizationKey ?? "<null>";
+                string small = ved?.SmallIcon != null ? ved.SmallIcon.name : "<null>";
+                string large = ved?.LargeIcon != null ? ved.LargeIcon.name : "<null>";
+                string aspect = d.BodyPartAspectDef != null ? d.BodyPartAspectDef.name : "<null>";
+                string skinType = d.SkinData != null ? d.SkinData.GetType().Name : "<null>";
+                string skinName = d.SkinData != null ? d.SkinData.name : "<null>";
+                TheTurnedMain.LogInfo($"  PART '{d.name}' tier={tier} vedName='{(ved != null ? ved.name : "<null>")}' "
+                    + $"disp='{disp}' small='{small}' large='{large}' aspect='{aspect}' skinType={skinType} skin='{skinName}'");
+                // Model fingerprint: RuntimeKey of every AssetReference field on the SkinData def
+                // (two parts with the same RuntimeKey render the SAME mesh/prefab).
+                DumpAssetReferenceKeys("    skin", d.SkinData);
+            }
+        }
+
+        /// <summary>Reflect over an object's fields; for every AssetReference-like field (UnityEngine
+        /// Addressables, detected by type name to avoid a compile-time assembly reference), log its
+        /// RuntimeKey (the addressable address — the model/prefab identity, comparable across parts).</summary>
+        private static void DumpAssetReferenceKeys(string label, object def)
+        {
+            if (def == null)
+            {
+                return;
+            }
+            foreach (FieldInfo f in def.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                object val = null;
+                try { val = f.GetValue(def); } catch { continue; }
+                if (val == null)
+                {
+                    continue;
+                }
+                Type vt = val.GetType();
+                // AssetReferenceGameObject / AssetReference etc. — match by type name (no assembly ref).
+                if (vt.Name.IndexOf("AssetReference", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    continue;
+                }
+                object key = null;
+                try
+                {
+                    PropertyInfo rk = vt.GetProperty("RuntimeKey", BindingFlags.Instance | BindingFlags.Public);
+                    key = rk != null ? rk.GetValue(val) : null;
+                }
+                catch { }
+                TheTurnedMain.LogInfo($"{label} assetRef field='{f.Name}' type={vt.Name} runtimeKey='{key ?? "<null>"}'");
+            }
         }
 
         /// <summary>Phase-B: dump loc keys + granted abilities (name + AP cost) per base-tier card.</summary>
