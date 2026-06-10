@@ -2,6 +2,8 @@ using Base.Defs;
 using Base.Entities.Abilities;
 using HarmonyLib;
 using PhoenixPoint.Common.Entities.Addons;
+using PhoenixPoint.Common.Entities.GameTags;
+using PhoenixPoint.Common.Entities.GameTagsTypes;
 using PhoenixPoint.Common.Entities.Items;
 using PhoenixPoint.Common.UI;
 using PhoenixPoint.Geoscape.View.ViewModules;
@@ -158,6 +160,51 @@ namespace TheTurned.Core
                 // Model fingerprint: RuntimeKey of every AssetReference field on the SkinData def
                 // (two parts with the same RuntimeKey render the SAME mesh/prefab).
                 DumpAssetReferenceKeys("    skin", d.SkinData);
+            }
+
+            // (g) SHADER PROBE — for the Umbra clones, log each SkinData-prefab renderer's shader name + which
+            //     candidate color params the shader exposes. Settles whether the blue mesh tint can write a
+            //     color param (the CustomizationColor path) or whether we must pivot to a whole-actor color FX.
+            DumpShaderProbe(repo);
+        }
+
+        /// <summary>SHADER PROBE for the blue-Umbra mesh-tint feasibility. For the Umbra head + arm clones,
+        /// resolve their SkinData prefab variants and, per Renderer, log the shader name + HasProperty for the
+        /// blue tag's ShaderParamName and common color params (_Color/_BaseColor/_PrimaryColor/_SecondaryColor).
+        /// If none are present, the Crabman shader has no writable tint param → pivot to a whole-actor FX.</summary>
+        private static void DumpShaderProbe(DefRepository repo)
+        {
+            string blueParam = (DefUtils.ResolveByName<GameTagDef>(repo, "CustomizationSecondaryColorTagDef_2")
+                as CustomizationColorTagDef)?.ShaderParamName;
+            string[] candidates = { blueParam, "_Color", "_BaseColor", "_PrimaryColor", "_SecondaryColor",
+                "_TintColor", "_Color2", "_ColorTint" };
+            TheTurnedMain.LogInfo($"[TheTurned] DUMP SHADER PROBE (blue tag ShaderParamName='{blueParam ?? "<null>"}'):");
+            foreach (string defName in new[] { "TheTurned_Crabman_Head_Umbra_BodyPartDef", "TheTurned_Crabman_RightArm_Umbra_BodyPartDef" })
+            {
+                TacticalItemDef d = DefUtils.ResolveByName<TacticalItemDef>(repo, defName);
+                if (d?.SkinData == null)
+                {
+                    TheTurnedMain.LogInfo($"  '{defName}': SkinData null — skipped.");
+                    continue;
+                }
+                GameObject[] variants;
+                try { variants = d.SkinData.GetAllVariants()?.Where(g => g != null).ToArray() ?? new GameObject[0]; }
+                catch (Exception e) { TheTurnedMain.LogInfo($"  '{defName}': GetAllVariants threw {e.GetType().Name} (prefabs not loaded?)"); continue; }
+                TheTurnedMain.LogInfo($"  '{defName}': {variants.Length} prefab variant(s).");
+                foreach (GameObject go in variants)
+                {
+                    foreach (Renderer r in go.GetComponentsInChildren<Renderer>(true))
+                    {
+                        Material m = r != null ? r.sharedMaterial : null;
+                        if (m == null || m.shader == null)
+                        {
+                            continue;
+                        }
+                        string has = string.Join(", ", candidates.Where(c => !string.IsNullOrEmpty(c))
+                            .Select(c => $"{c}={(m.HasProperty(c) ? "Y" : "n")}"));
+                        TheTurnedMain.LogInfo($"      renderer '{r.name}' shader='{m.shader.name}' props[{has}]");
+                    }
+                }
             }
         }
 

@@ -1,4 +1,6 @@
 using Base.Defs;
+using PhoenixPoint.Common.Entities.GameTags;
+using PhoenixPoint.Common.Entities.GameTagsTypes;
 using PhoenixPoint.Common.UI;
 using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
@@ -72,6 +74,7 @@ namespace TheTurned.Core
             // keyed by bodypart GUID) resolves the correct matched hand / armor. Additive: appended AFTER
             // PickDefaults so the recruit DEFAULT head stays the real base Humanoid.
             BuildAuthoredHeadVariants(repo);
+            BuildAuthoredArmVariants(repo);
             bool firstAttempt = !_attempted;
             _attempted = true;
             _built = HasSets;
@@ -306,13 +309,61 @@ namespace TheTurned.Core
                 HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });
             }
 
+            // -- UMBRA head card (PROBE) — EliteHumanoid clone (armored model) + BLUE mesh tint ----
+            TacticalItemDef umbraHead = CloneHeadBodypart(repo,
+                armoredSource, "head:authored:Umbra", "TheTurned_Crabman_Head_Umbra_BodyPartDef", armorBonus: 0f);
+            if (umbraHead != null)
+            {
+                TintBlue(repo, umbraHead);
+                HeadSets.Add(new MatchedSet { BodyPart = umbraHead, Hand = null, IsRight = false, Token = "Umbra" });
+            }
+
             _authoredHeadsBuilt = true;
+        }
+
+
+        private static bool _authoredArmsBuilt;
+
+        /// <summary>
+        /// Author the UMBRA CLAW right-arm card (PROBE): a clone of the base Pincer arm bodypart (keeps its
+        /// SubAddon Pincer hand → the matched hand auto-attaches, BUG-B-safe) with a BLUE mesh tint + own VED.
+        /// Added to RightArmSets with the Pincer hand so EnforceSetForBodypart resolves it; the right card
+        /// filter (token != "Pincer") admits the "Umbra" token → right cards = {MG, Viral, Umbra}. The base
+        /// Pincer + recruit default are untouched.
+        /// </summary>
+        private static void BuildAuthoredArmVariants(DefRepository repo)
+        {
+            if (_authoredArmsBuilt || repo == null)
+            {
+                return;
+            }
+            // Base Pincer set (bodypart + its hand weapon) = the right default.
+            MatchedSet pincer = DefaultRight
+                ?? NonElite(RightArmSets).FirstOrDefault(s => s.Token != null
+                    && s.Token.IndexOf("Pincer", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (pincer?.BodyPart == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored arms: base Pincer arm unresolved — Umbra claw skipped");
+                return;
+            }
+            TacticalItemDef umbraArm = CloneHeadBodypart(repo,
+                pincer.BodyPart, "arm:authored:Umbra", "TheTurned_Crabman_RightArm_Umbra_BodyPartDef", armorBonus: 0f);
+            if (umbraArm != null)
+            {
+                TintBlue(repo, umbraArm);
+                // Hand = the Pincer weapon; the clone keeps Pincer's SubAddon so EnforceSetForBodypart skips
+                // the flat-hand add (BodypartCarriesHandSubaddon == true) and the native+SubAddon path attaches it.
+                RightArmSets.Add(new MatchedSet { BodyPart = umbraArm, Hand = pincer.Hand, IsRight = true, Token = "Umbra" });
+            }
+            _authoredArmsBuilt = true;
         }
 
         /// <summary>Extra armor added to the authored armored head bodypart (vanilla base head armor = 10).</summary>
         private const float ArmoredHeadArmorBonus = 10f;
 
         /// <summary>Idempotent clone of a head bodypart def with an optional armor bonus (ItemDef.Armor [G]).</summary>
+        // Generic bodypart clone (head OR arm): deep-clones the source TacticalItemDef (keeps SkinData +
+        // SubAddons by reference), renames it, optional Armor bump, and gives it its OWN cloned VED.
         private static TacticalItemDef CloneHeadBodypart(DefRepository repo, TacticalItemDef source,
             string guidSeed, string cloneName, float armorBonus)
         {
@@ -359,6 +410,38 @@ namespace TheTurned.Core
                 }
             }
             return clone;
+        }
+
+
+        /// <summary>Blue-mesh-tint PROBE: enable per-item color customization on a clone and add the vanilla
+        /// BLUE customization color tag, so <c>Item.RefreshTags</c> [G Item.cs:128-150] writes the palette
+        /// blue into the bodypart shader via <c>HighlightControllerComponent.CustomizeColor(tag.ShaderParamName,
+        /// color)</c>. `AlwaysCustomizeColor=true` satisfies the `flag2` gate. Blue tag =
+        /// `CustomizationSecondaryColorTagDef_2` (the secondary BLUE, confirmed [T TFTVDefsInjectedOnlyOnce.cs:3282]).
+        /// Works ONLY if the Crabman bodypart shader exposes that color param — UNKNOWN, hence the probe +
+        /// the shader diagnostics. Reuses the existing vanilla tag; mutates only the CLONE (its Tags are
+        /// deep-copied by CreateDef, same as AugmentVariants.Prepare's BionicalTag add). Null-guarded.</summary>
+        private static void TintBlue(DefRepository repo, TacticalItemDef clone)
+        {
+            if (clone == null)
+            {
+                return;
+            }
+            clone.AlwaysCustomizeColor = true;
+            GameTagDef blue = DefUtils.ResolveByName<GameTagDef>(repo, "CustomizationSecondaryColorTagDef_2");
+            if (blue == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] umbra tint: 'CustomizationSecondaryColorTagDef_2' (blue) not found — "
+                    + $"'{clone.name}' AlwaysCustomizeColor set but no blue tag added.");
+                return;
+            }
+            if (clone.Tags != null && !clone.Tags.Contains(blue))
+            {
+                clone.Tags.Add(blue);
+            }
+            string shaderParam = (blue as CustomizationColorTagDef)?.ShaderParamName ?? "<not-a-ColorTag>";
+            TheTurnedMain.LogInfo($"[TheTurned] umbra tint: '{clone.name}' AlwaysCustomizeColor=true, "
+                + $"added blue tag '{blue.name}' (ShaderParamName='{shaderParam}').");
         }
     }
 }
