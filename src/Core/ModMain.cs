@@ -55,9 +55,9 @@ namespace TheTurned
             // Phase-4: post-mission limb auto-restore for the survival capstone (no-op when TFTV absent).
             LimbRestoreHook.Apply((Harmony)HarmonyInstance);
 
-            // Phase-4: skip rendering the Personal + Secondary rows on the mutoid progression screen
-            // (element pools are 5-wide by prefab design; the popup is the recruits' progression surface).
-            RowRenderSkipPatch.Apply((Harmony)HarmonyInstance);
+            // Phase-4: clamp the Personal + Secondary row render to the prefab pool size (5) on the
+            // mutoid progression screen (hiding the rows blanked the screen — they ARE the visible UI).
+            RowRenderClampPatch.Apply((Harmony)HarmonyInstance);
 
             // Phase-4: backfill the mutoid popup's null row/cell prefab templates (overflow = our fed rows).
             PopupPrefabPatch.Apply((Harmony)HarmonyInstance);
@@ -98,7 +98,10 @@ namespace TheTurned
             if (geo != null)
             {
                 // Diagnostic (once): mutoid progression MaxLevel — documents the 5-wide-pool/7-level
-                // mismatch behind RowRenderSkipPatch (FactionCharacterGenerator.MutoidLevelProgression).
+                // mismatch behind RowRenderClampPatch (FactionCharacterGenerator.MutoidLevelProgression).
+                // In-game 2026-06-10 this printed <null>: the field isn't wired on this generator
+                // instance — vanilla mutoid level count isn't recoverable here; our recruits use the
+                // borrowed HUMAN LevelProgressionDef (MaxLevel 7) regardless.
                 if (!_mutoidMaxLevelLogged && Phase4.Enabled)
                 {
                     _mutoidMaxLevelLogged = true;

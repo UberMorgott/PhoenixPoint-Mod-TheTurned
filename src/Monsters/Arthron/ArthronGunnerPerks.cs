@@ -8,6 +8,8 @@ using PhoenixPoint.Common.Entities.GameTags;
 using PhoenixPoint.Common.Entities.GameTagsTypes;
 using PhoenixPoint.Tactical.Entities.Abilities;
 using PhoenixPoint.Tactical.Entities.Equipments;
+using PhoenixPoint.Tactical.Levels;
+using System.Linq;
 using TheTurned.Core;
 
 namespace TheTurned.Monsters.Arthron
@@ -192,8 +194,11 @@ namespace TheTurned.Monsters.Arthron
         /// the runtime type (ReturnFireAbilityDef — CreateDef&lt;T&gt; would flatten to TacticalAbilityDef
         /// and lose the return-fire behavior, DefRepository.cs:254-283); own prog data (20/20 row scale,
         /// empty PersonalTrackTags so the clone never enters human rolls); own VED cloned from the
-        /// VANILLA one (keeps the real icon) rebound to our CSV keys. Idempotent; null on create
-        /// failure → caller falls back to the passive.
+        /// VANILLA one (keeps the real icon) rebound to our CSV keys. ONE exact-instance check exists:
+        /// the post-MELEE riposte whitelist (BashAbility.cs:542-543 filters retaliators by
+        /// TacticalLevelControllerDef.AllowedReturnFireAbilitiesAfterMeleeAttack.Contains(def), :63) —
+        /// the clone is appended next to the vanilla def there (idempotent). Normal shot retaliation
+        /// is unfiltered. Idempotent; null on create failure → caller falls back to the passive.
         /// </summary>
         private static TacticalAbilityDef CloneReturnFire(DefRepository repo, TacticalAbilityDef vanilla)
         {
@@ -224,7 +229,28 @@ namespace TheTurned.Monsters.Arthron
                 ved.Description = new LocalizedTextBind("ARTHRON_RETURNFIRE_DESC");
                 clone.ViewElementDef = ved; // icon inherited from the vanilla VED clone
             }
+            WhitelistMeleeRiposte(repo, vanilla, clone);
             return clone;
+        }
+
+        /// <summary>Post-melee riposte gate is an exact-instance whitelist (see CloneReturnFire doc):
+        /// wherever a TacticalLevelControllerDef whitelists the vanilla def, append the clone (idempotent).</summary>
+        private static void WhitelistMeleeRiposte(DefRepository repo, TacticalAbilityDef vanilla, TacticalAbilityDef clone)
+        {
+            if (!(vanilla is ReturnFireAbilityDef rfVanilla) || !(clone is ReturnFireAbilityDef rfClone))
+            {
+                return;
+            }
+            foreach (TacticalLevelControllerDef lcd in repo.GetAllDefs<TacticalLevelControllerDef>())
+            {
+                ReturnFireAbilityDef[] allowed = lcd?.AllowedReturnFireAbilitiesAfterMeleeAttack;
+                if (allowed == null || !allowed.Contains(rfVanilla) || allowed.Contains(rfClone))
+                {
+                    continue;
+                }
+                lcd.AllowedReturnFireAbilitiesAfterMeleeAttack = allowed.Append(rfClone).ToArray();
+                TheTurnedMain.LogInfo($"[TheTurned] ReturnFire clone whitelisted for post-melee riposte on '{lcd.name}'.");
+            }
         }
 
         // --- Slot 5: Spotter Eyes (+Perception +Accuracy) ---------------------------------------
