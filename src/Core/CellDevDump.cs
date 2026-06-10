@@ -52,19 +52,9 @@ namespace TheTurned.Core
                 else { add.Add(def); }
             }
 
-            // Clone the recruit's current armour, drop the occupants of the slots we touch, then add the new
-            // bodyparts and commit with ONE SetItems(armour:) — same slot-clear-then-add discipline as
-            // ArthronArms.SwapSet (ArthronArms.cs:209/350).
-            var list = new List<GeoItem>(recruit.ArmourItems);
-            // Clear the slots we touch: legs (all), torso (only when adding elite torso), carapace.
-            list.RemoveAll(i => i?.ItemDef?.name != null &&
-                (i.ItemDef.name.IndexOf("Crabman_Legs", StringComparison.OrdinalIgnoreCase) >= 0
-              || i.ItemDef.name.IndexOf("Crabman_Carapace", StringComparison.OrdinalIgnoreCase) >= 0
-              || (_variant == 1 && i.ItemDef.name.IndexOf("Crabman_Torso", StringComparison.OrdinalIgnoreCase) >= 0
-                                && i.ItemDef.name.IndexOf("EliteTorso", StringComparison.OrdinalIgnoreCase) < 0)
-              || (_variant == 1 && i.ItemDef.name.IndexOf("Crabman_EliteTorso", StringComparison.OrdinalIgnoreCase) >= 0)));
-            foreach (var d in add) { list.Add(new GeoItem(d)); }
-
+            // Reuse the SHARED, M1-proven loadout recipe (slot-clear-then-add) so the dev action and the real
+            // cell-armor apply path stay in lock-step (DRY). One SetItems(armour:) commits it.
+            List<GeoItem> list = CellArmorApply.BuildArmorList(recruit, add);
             recruit.SetItems(armour: list);
             TheTurnedMain.LogInfo($"[TheTurned] CellDevDump variant {(_variant == 0 ? "A" : "B")} applied "
                 + $"({add.Count}/{names.Length} resolved): [{string.Join(", ", add.Select(d => d.name))}] "

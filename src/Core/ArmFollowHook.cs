@@ -71,9 +71,14 @@ namespace TheTurned.Core
             if (_subscribed.Add(prog))
             {
                 // Capture the GeoCharacter; re-derive on any ability add (arm-marker or not — guarded inside).
-                prog.OnAbilityAdded += _ => ArthronArms.ApplyChosenSets(geoChar);
+                prog.OnAbilityAdded += _ =>
+                {
+                    ArthronArms.ApplyChosenSets(geoChar);
+                    CellArmorApply.ApplyLearnedArmor(geoChar);
+                };
             }
             ArthronArms.ApplyChosenSets(geoChar);
+            CellArmorApply.ApplyLearnedArmor(geoChar);
         }
 
         private static bool IsTurnedArthron(GeoCharacter geoChar)

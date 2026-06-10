@@ -195,6 +195,12 @@ namespace TheTurned.Monsters.Arthron
             var survivalCells = ArthronSurvivalPerks.BuildRowCells(repo);
             SpecRowFactory.GetOrCreateRow(repo, "Survival", "ARTHRON_ROW_SURVIVAL", "ArthronSurvival_Regen.png",
                 classTag, survivalCells, fillerIcon: "Arthron_Spec.png");
+
+            // ROW — Cell progression (top yellow 5-cell track). NOT gated on CrabmanParts.HasSets: the
+            // armor cells resolve their leg/torso/carapace defs lazily at apply time (CellArmorApply),
+            // and the stat/nav cells are repo-global. Runs every pass (idempotent get-or-create).
+            SpecRowFactory.GetOrCreateRow(repo, "Cell", "ARTHRON_ROW_CELL", "Arthron_Spec.png",
+                classTag, ArthronCellRow.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)
