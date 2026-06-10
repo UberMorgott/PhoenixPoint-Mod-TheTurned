@@ -54,6 +54,12 @@ namespace TheTurned
             // anim-actions for the recruit only. Idempotent (guarded inside Apply).
             RecruitAnimActionsPatch.Apply((Harmony)HarmonyInstance);
 
+            // Preview-model offset fix: the recruit shares the Crabman VED whose (TFTV-patched) BuilderViewParamDef
+            // carries an enemy-tuned X, shifting the hire/character/augment preview model left. This marker-scoped
+            // OnCharacterRebuilded Postfix forces the module's centered DefaultBuilderViewParams for our recruit only.
+            // Idempotent (guarded inside Apply).
+            RecruitPreviewPlacementPatch.Apply((Harmony)HarmonyInstance);
+
             // V1 Phase-1 augment screen: DNA button + marker-scoped show/hide + one-shot diagnostics dump.
             // All idempotent (guarded inside each Apply). The dump is Phase4-gated and self-removes after one fire.
             AugmentButtonPatch.Apply((Harmony)HarmonyInstance);
