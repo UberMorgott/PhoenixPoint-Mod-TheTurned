@@ -16,6 +16,12 @@ namespace TheTurned.Core
         /// (see <see cref="DevUnlockPatch"/>). Flip false for release.</summary>
         internal const bool DevUnlockAllLevels = true;
 
+        /// <summary>REV-2 2-row in-panel cell layout (top=5 SP/level Primary track, bottom=Mutagen Personal).
+        /// When true, the recruit is routed to the HUMAN ability-track container (gate NOT OR'd into
+        /// _hasPandoranProgression) with a 5-level LevelProgressionDef, instead of the mutoid popup container.
+        /// M-PROBE de-risks this; M-LAYOUT/M-CELLS formalize it. Flip false to revert to the REV-1 mutoid path.</summary>
+        internal const bool TwoRowCellLayout = true;
+
         /// <summary>True only when TFTV resolved as dependency. All Phase-4 features gate on this.</summary>
         internal static bool Enabled { get; private set; }
 

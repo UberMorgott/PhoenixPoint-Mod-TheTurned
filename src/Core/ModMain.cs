@@ -92,6 +92,10 @@ namespace TheTurned
             // DEV: unlock all progression levels for Phase-4 recruits (no-op unless DevUnlockAllLevels).
             DevUnlockPatch.Apply((Harmony)HarmonyInstance);
 
+            // REV-2 M-PROBE (TEMP, remove in M-FINAL): one-shot read-only dump of the recruit's progression
+            // container/level/track shape, to de-risk the 2-row human-container layout before mass authoring.
+            CellProbe.Apply((Harmony)HarmonyInstance);
+
             // Attach the hotkey poller to the mod's live GameObject (persists for mod lifetime).
             GameObject go = ModGO;
             if (go != null)

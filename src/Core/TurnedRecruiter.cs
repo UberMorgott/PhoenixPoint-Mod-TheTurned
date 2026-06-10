@@ -160,7 +160,26 @@ namespace TheTurned.Core
             }
 
             // Non-null progression so the BetterClasses Prefix's ShouldGeneratePersonalAbilities read is safe.
-            clone.Data.LevelProgression = new LevelProgression(borrowed);
+            // REV-2 (M-PROBE step 2, formalized in M-LAYOUT.1): on the 2-row layout, assign a 5-LEVEL cloned
+            // LevelProgressionDef (LevelXPTable trimmed to 5 -> MaxLevel 5, SecondSpecializationLevel disabled)
+            // so the human ability-track container renders a 5-column shape with no dual-spec level. Inline
+            // here for the probe; Level5Progression.cs formalizes it in M-LAYOUT.
+            LevelProgressionDef levelProg = borrowed;
+            if (Phase4.TwoRowCellLayout && borrowed.LevelXPTable != null && borrowed.LevelXPTable.Length >= 5)
+            {
+                LevelProgressionDef clone5 = DefUtils.CloneDef<LevelProgressionDef>(repo,
+                    Phase4.DeriveGuid("levelprog5:" + monster.Id).ToString(), borrowed);
+                if (clone5 != null)
+                {
+                    clone5.name = "TheTurned_" + monster.Id + "_LevelProgression5";
+                    clone5.LevelXPTable = borrowed.LevelXPTable.Take(5).ToArray();
+                    clone5.SecondSpecializationLevel = 0;
+                    levelProg = clone5;
+                    Log?.LogInfo($"[TheTurned] 2-row layout: assigned 5-level LevelProgressionDef '{clone5.name}' "
+                        + $"(MaxLevel={clone5.MaxLevel}) to '{monster.Id}'.");
+                }
+            }
+            clone.Data.LevelProgression = new LevelProgression(levelProg);
 
             // Per-def Data.GameTags only (shared HumanTag/AlienTag untouched -> IsAlien stays true).
             ClassTagDef classTag = Tags.GetClassTag(repo, monster);

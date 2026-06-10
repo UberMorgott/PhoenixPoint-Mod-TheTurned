@@ -45,7 +45,9 @@ namespace TheTurned.Monsters.Arthron
         public override string ProficiencyVedGuid => "c9eb1d3f-8da0-b1c2-fe40-9f6d71820425";
 
         // --- Phase 3: second spec row "Carapace Gunner" -----------------------------------------
-        public override bool HasSecondarySpec => true;
+        // REV-2 (M-PROBE step 3 / M-LAYOUT): on the 2-row layout, suppress the secondary spec so the human
+        // container shows only Primary + Personal tracks (= 2 rows). Reverts when TwoRowCellLayout is false.
+        public override bool HasSecondarySpec => !Phase4.TwoRowCellLayout;
         public override string SecondarySpecName => "TheTurned_ArthronGunner_SpecializationDef";
         public override string SecondaryClassTagName => "TheTurned_ArthronGunner_ClassTagDef";
         public override string SecondarySpecDisplayName => "Carapace Gunner";

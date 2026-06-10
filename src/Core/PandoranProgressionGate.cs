@@ -70,8 +70,15 @@ namespace TheTurned.Core
         public static bool OrGate(bool original, UIModuleCharacterProgression module)
         {
             if (original) return true;
+            // REV-2 (M-PROBE/M-LAYOUT): on the 2-row layout, DON'T OR our recruit -> _hasPandoranProgression
+            // stays false -> the HUMAN ability-track container draws (2 rows), not the mutoid popup container.
+            // (TwoRowCellLayout is a compile-time const, so the mutoid-path code below is intentionally
+            //  unreachable while it is true; it reactivates verbatim when the const is flipped to false.)
+#pragma warning disable CS0162 // Unreachable code (const-folded TwoRowCellLayout switch — intentional, revertible)
+            if (Phase4.TwoRowCellLayout) return original;
             var character = (GeoCharacter)CharacterField.GetValue(module);   // assigned just before the gate line
             return Phase4.IsPhase4Recruit(character);
+#pragma warning restore CS0162
         }
     }
 }
