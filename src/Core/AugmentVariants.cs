@@ -67,7 +67,13 @@ namespace TheTurned.Core
                 // Acid_Grenade}. Exclude the bare arm here (it stays equippable, just not a card).
                 .Concat(CrabmanParts.BaseTier(CrabmanParts.LeftArmSets)
                     .Where(s => !string.IsNullOrEmpty(s.Token)))
-                .Concat(CrabmanParts.BaseTier(CrabmanParts.RightArmSets))
+                // The base Pincer claw (Crabman_RightArm_Pincer_BodyPartDef) is the recruit's equipped
+                // DEFAULT — it must NOT appear as a selectable card. Right cards = {MG, Viral MG} for now
+                // (the Umbra-claw is pending a recolor investigation). Exclude the Pincer token here (it
+                // stays equippable, just not a card). Same base-is-default principle as head/left.
+                .Concat(CrabmanParts.BaseTier(CrabmanParts.RightArmSets)
+                    .Where(s => s.Token == null
+                        || s.Token.IndexOf("Pincer", StringComparison.OrdinalIgnoreCase) < 0))
                 .Select(s => s.BodyPart).Where(b => b != null).Distinct();
 
         internal static bool Ready => _prepared && HeadSlot != null && LeftArmSlot != null && RightArmSlot != null;
