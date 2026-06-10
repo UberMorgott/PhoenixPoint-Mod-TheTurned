@@ -143,6 +143,23 @@ namespace TheTurned.Core
                     DumpItemTextAndAbilities("    hand", set.Hand);
                 }
             }
+
+            // Shield deploy ability is NOT on Crabman_LeftArm_Shield_BodyPartDef.Abilities[] (verified <none>)
+            // — it is granted at runtime / lives as a separate def. Enumerate every DeployShieldAbilityDef in
+            // the repo so we can identify the one tied to the Crabman shield (name + AP + loc keys). OPEN item.
+            DefRepository repo = DefUtils.Repo;
+            if (repo != null)
+            {
+                var deploys = repo.GetAllDefs<DeployShieldAbilityDef>().Where(d => d != null).ToList();
+                TheTurnedMain.LogInfo($"[TheTurned] DUMP PHASE-B DeployShieldAbilityDef instances ({deploys.Count}):");
+                foreach (DeployShieldAbilityDef d in deploys)
+                {
+                    var ved = d.ViewElementDef;
+                    TheTurnedMain.LogInfo($"    '{d.name}' ap={d.ActionPointCost:0.###} "
+                        + $"nameKey='{ved?.DisplayName1?.LocalizationKey ?? "<null>"}' "
+                        + $"descKey='{ved?.Description?.LocalizationKey ?? "<null>"}'");
+                }
+            }
         }
 
         private static void DumpItemTextAndAbilities(string label, ItemDef item)

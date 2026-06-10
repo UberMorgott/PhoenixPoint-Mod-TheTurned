@@ -87,11 +87,16 @@ namespace TheTurned.Core
                     ArmFollowHook.Subscribe(geoChar);   // matched-SET re-derive on every future level-up
                 }
 
-                // 4c. V1 base loadout: the recruit clones the TRUE BASE Arthron def verbatim
-                //     (ArthronMonster.ResolveTemplate now resolves 'Crabman_AlienMutationVariationDef'),
-                //     so right=base Pincer claw, head=plain Humanoid (no spit), legs=unarmored, left=plain
-                //     base arm — NO stripping/mutation. (The earlier StripSide shield-strip was WRONG and
-                //     has been removed.) Log the resolved BodypartItems once so the loadout is verifiable.
+                // 4c. V1 NAKED BASE loadout. The base def the game ships (Crabby_AlienMutationVariationDef)
+                //     carries spitter head + shield + elite-agile legs, so the weakest/earliest "naked"
+                //     Arthron the user wants must be CONSTRUCTED: keep chassis Humanoid head + right Pincer
+                //     (+SubAddon hand) + torso; drop the spit head weapon; left -> plain Crabman_LeftArm_
+                //     BodyPartDef; legs -> unarmored Crabman_Legs_Agile_ItemDef. Crabman-only (HasSets).
+                if (ArthronArms.HasOptions)
+                {
+                    ArthronArms.ApplyNakedBase(geoChar);
+                }
+                // Log the resulting BodypartItems once so the loadout is verifiable from Player.log.
                 if (Log != null)
                 {
                     string parts = string.Join(", ", geoChar.ArmourItems

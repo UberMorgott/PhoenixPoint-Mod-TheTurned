@@ -1,4 +1,5 @@
 using Base.Defs;
+using PhoenixPoint.Common.UI;
 using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
 using System;
@@ -308,6 +309,29 @@ namespace TheTurned.Core
             if (armorBonus > 0f)
             {
                 clone.Armor = source.Armor + armorBonus;
+            }
+            // CRITICAL: give the clone its OWN ViewElementDef. Unity's CreateDef deep-copies the ItemDef but
+            // copies the ViewElementDef as a shared REFERENCE — so the base Humanoid head + both authored
+            // clones would share ONE VED, and AugmentVariants.RebindNames (called per card) would have the
+            // LAST write win for all three (verified: all heads showed "Armored Head"), and would corrupt
+            // the real enemy Humanoid head's VED. Clone the VED (non-generic CreateDef preserves its runtime
+            // type) so each authored head owns its name/description independently.
+            ViewElementDef srcVed = source.ViewElementDef;
+            if (srcVed != null)
+            {
+                string vedGuid = Phase4.DeriveGuid(guidSeed + "|ved").ToString();
+                ViewElementDef newVed = repo.GetDef(vedGuid) as ViewElementDef
+                    ?? repo.CreateDef(vedGuid, srcVed) as ViewElementDef;
+                if (newVed != null)
+                {
+                    newVed.name = "E_ViewElement [" + cloneName + "]";
+                    clone.ViewElementDef = newVed;
+                }
+                else
+                {
+                    TheTurnedMain.LogWarn($"[TheTurned] authored heads: VED clone failed for '{cloneName}' — "
+                        + "card may share the base head's name.");
+                }
             }
             return clone;
         }

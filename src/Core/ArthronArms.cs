@@ -271,6 +271,71 @@ namespace TheTurned.Core
             }
         }
 
+
+        /// <summary>
+        /// Force a freshly-recruited Crabman to the NAKED BASE loadout (the weakest/earliest Arthron). The
+        /// base def the game ships (`Crabby_AlienMutationVariationDef`) carries spitter head + shield + elite
+        /// legs, so the naked loadout must be CONSTRUCTED. Keeps the chassis Humanoid head + right Pincer
+        /// (+ its SubAddon hand) + torso; corrects the other three slots:
+        ///   - HEAD: drop the spitter head WEAPON (the Humanoid head bodypart is on the chassis) -> no spit.
+        ///   - LEFT arm: replace whatever is there with the plain `Crabman_LeftArm_BodyPartDef` (real part).
+        ///   - LEGS: replace elite/armoured legs with the unarmored base `Crabman_Legs_Agile_ItemDef`.
+        /// All defs resolved by exact NAME (bundle GUIDs unknown). Missing def -> warn + leave that slot.
+        /// </summary>
+        internal static void ApplyNakedBase(GeoCharacter geoChar)
+        {
+            try
+            {
+                if (geoChar?.ArmourItems == null)
+                {
+                    return;
+                }
+                DefRepository repo = DefUtils.Repo;
+                TacticalItemDef plainLeft = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_LeftArm_BodyPartDef");
+                TacticalItemDef agileLegs = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Legs_Agile_ItemDef");
+
+                var list = new List<GeoItem>(geoChar.ArmourItems);
+                int before = list.Count;
+
+                // HEAD: drop any head WEAPON (e.g. the spitter) so the chassis Humanoid head has no spit.
+                list.RemoveAll(i => i?.ItemDef is WeaponDef && i.ItemDef.name != null
+                    && i.ItemDef.name.IndexOf("Crabman_Head", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                // LEFT arm: remove the existing left bodypart + any left hand weapon, add the plain arm.
+                list.RemoveAll(i => i?.ItemDef?.name != null
+                    && (i.ItemDef.name.IndexOf(LeftHandToken, StringComparison.OrdinalIgnoreCase) >= 0
+                     || (i.ItemDef.name.IndexOf(LeftArmToken, StringComparison.OrdinalIgnoreCase) >= 0 && !(i.ItemDef is WeaponDef))));
+                if (plainLeft != null)
+                {
+                    list.Add(new GeoItem(plainLeft));
+                }
+                else
+                {
+                    Log?.LogWarning("[TheTurned] naked base: 'Crabman_LeftArm_BodyPartDef' not found — left arm left as-is.");
+                }
+
+                // LEGS: remove any leg item, add the unarmored Agile legs.
+                list.RemoveAll(i => i?.ItemDef?.name != null
+                    && i.ItemDef.name.IndexOf("Crabman_Legs", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (agileLegs != null)
+                {
+                    list.Add(new GeoItem(agileLegs));
+                }
+                else
+                {
+                    Log?.LogWarning("[TheTurned] naked base: 'Crabman_Legs_Agile_ItemDef' not found — legs left as-is.");
+                }
+
+                geoChar.SetItems(armour: list);
+                Log?.LogInfo($"[TheTurned] naked base applied for '{geoChar.GetName()}' "
+                    + $"(items {before} -> {list.Count}; dropped spit head weapon, plain left arm, agile legs).");
+            }
+            catch (Exception e)
+            {
+                Log?.LogWarning("[TheTurned] ApplyNakedBase failed: " + e);
+            }
+        }
+
         // §9 migration: characters already checked this session (one-shot; ScanAndSubscribe re-runs on every
         // geoscape load, the cleanup must not).
         private static readonly HashSet<GeoCharacter> _migrationChecked = new HashSet<GeoCharacter>();

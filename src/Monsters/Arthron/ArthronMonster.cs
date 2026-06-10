@@ -81,19 +81,18 @@ namespace TheTurned.Monsters.Arthron
             {
                 return null;
             }
-            // TRUE BASE STARTER Arthron = the canonical base variation def, NOT "alphabetically-first
-            // non-Elite". Ordinal-first picked numbered role variants (e.g. Crabman3_AdvancedCharger —
-            // '3' < '_' in ordinal) which ship ARMORED legs + spitter heads + role loadouts → recruit
-            // spawned wrong (armored legs, spitter head). The weakest earliest Arthron the player meets
-            // is `Crabman_AlienMutationVariationDef` [recruit doc §1 / arthron-compendium §1.1]. Resolve
-            // it by exact name; fall back to the old non-high-tier heuristic only if absent (and exclude
-            // the SpawningPool lair variant, which is a structure, not a field unit).
-            TacCharacterDef chosen = crabmen.FirstOrDefault(d => d.name == "Crabman_AlienMutationVariationDef");
+            // TRUE BASE chassis = `Crabby_AlienMutationVariationDef` (the base-game Arthron's real internal
+            // name, guid cf460fd0-…, VERIFIED in Player.log 2026-06-10). NOT "alphabetically-first non-Elite"
+            // (that picked Crabman3_AdvancedCharger — '3' < '_' in ordinal — armored legs/role loadout), and
+            // NOT "Crabman_AlienMutationVariationDef" (that def DOES NOT EXIST). Crabby ships spitter head +
+            // shield + elite legs, so the NAKED base is constructed post-spawn (ArthronArms.ApplyNakedBase);
+            // Crabby is the right chassis/model. Resolve by exact name; fall back only if absent.
+            TacCharacterDef chosen = crabmen.FirstOrDefault(d => d.name == "Crabby_AlienMutationVariationDef");
             if (chosen != null)
             {
                 return chosen;
             }
-            TheTurnedMain.LogWarn("[TheTurned] ResolveTemplate: 'Crabman_AlienMutationVariationDef' not found — "
+            TheTurnedMain.LogWarn("[TheTurned] ResolveTemplate: 'Crabby_AlienMutationVariationDef' not found — "
                 + "falling back to first non-high-tier Crabman (loadout may differ from true base).");
             chosen = crabmen
                 .Where(d => !IsHighTier(d.name)
