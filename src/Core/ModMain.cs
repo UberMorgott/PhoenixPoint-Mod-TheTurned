@@ -49,6 +49,12 @@ namespace TheTurned
             // Apply the shared marker-scoped CheckIsHuman Postfix. Idempotent (guarded inside Apply).
             HumanClassificationPatch.Apply((Harmony)HarmonyInstance);
 
+            // V1 Phase-1 augment screen: DNA button + marker-scoped show/hide + one-shot diagnostics dump.
+            // All idempotent (guarded inside each Apply). The dump is Phase4-gated and self-removes after one fire.
+            AugmentButtonPatch.Apply((Harmony)HarmonyInstance);
+            AugmentButtonVisibilityPatch.Apply((Harmony)HarmonyInstance);
+            AugmentDiagnosticsDump.Apply((Harmony)HarmonyInstance);
+
             // Phase-4: OR our recruits into the mutoid progression gate (no-op when TFTV absent).
             PandoranProgressionGate.Apply((Harmony)HarmonyInstance);
 
