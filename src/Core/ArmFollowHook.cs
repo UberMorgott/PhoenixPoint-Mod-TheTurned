@@ -29,7 +29,7 @@ namespace TheTurned.Core
         /// </summary>
         internal static void ScanAndSubscribe(GeoLevelController geo)
         {
-            if (geo?.PhoenixFaction == null || !Phase4.Enabled || !CrabmanParts.HasSets)
+            if (geo?.PhoenixFaction == null || !Phase4.Enabled)
             {
                 return;
             }
@@ -37,7 +37,15 @@ namespace TheTurned.Core
             {
                 foreach (GeoCharacter geoChar in geo.PhoenixFaction.Characters.ToList())
                 {
-                    if (IsTurnedArthron(geoChar))
+                    if (!IsTurnedArthron(geoChar))
+                    {
+                        continue;
+                    }
+                    // Save migration: pre-fix recruits carry a 7-slot runtime Personal track that
+                    // crashes the progression screen — reshape to maxLevel+1 (idempotent, not gated
+                    // on HasSets: the crash fix must apply even when arm sets failed to load).
+                    SpecRowFactory.ReshapeRuntimePersonalTrack(geoChar);
+                    if (CrabmanParts.HasSets)
                     {
                         Subscribe(geoChar);
                         // §9 one-shot migration of pre-e403584 arm rolls (additive, C4).

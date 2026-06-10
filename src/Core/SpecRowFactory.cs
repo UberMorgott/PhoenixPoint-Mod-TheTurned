@@ -205,6 +205,32 @@ namespace TheTurned.Core
         }
 
         /// <summary>
+        /// Runtime counterpart of <see cref="ReshapeWithSpacer"/>: the recruit's PERSONAL
+        /// <c>AbilityTrack</c> INSTANCE is created MaxLevel (7) slots long (CharacterProgression
+        /// ctor:106), but MutoidAbilityTrackContainerElement.GetAbilitySlotForLevel indexes
+        /// slots[maxLevel] (decompile :78-97) — needs maxLevel+1. Reshapes in place and re-wires the
+        /// slot→track back-refs the AbilityTrack ctor would normally set (LearnAbility reads
+        /// slot.AbilityTrack). Idempotent; returns true when the array was actually resized.
+        /// </summary>
+        internal static bool ReshapeRuntimePersonalTrack(GeoCharacter geoChar)
+        {
+            AbilityTrack track = geoChar?.Progression?.PersonalAbilityTrack;
+            if (track?.AbilitiesByLevel == null || track.AbilitiesByLevel.Length >= RowLength + 1)
+            {
+                return false;
+            }
+            int oldLength = track.AbilitiesByLevel.Length;
+            track.AbilitiesByLevel = ReshapeWithSpacer(track.AbilitiesByLevel,
+                totalLength: RowLength + 1, spacerIndex: SpacerIndex);
+            foreach (AbilityTrackSlot slot in track.AbilitiesByLevel)
+            {
+                slot.SetAbilityTrack(track);
+            }
+            TheTurnedMain.LogInfo($"[TheTurned] Personal track reshaped {oldLength}→{RowLength + 1} for '{geoChar.GetName()}'.");
+            return true;
+        }
+
+        /// <summary>
         /// Feed all built rows into <c>GeoPhoenixFaction.AvailablePandoranSpecialzations</c>.
         /// Idempotent (Contains-guarded); silent when nothing new was added (no log, no recruit scan).
         /// </summary>
