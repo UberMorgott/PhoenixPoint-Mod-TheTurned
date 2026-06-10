@@ -114,18 +114,10 @@ namespace TheTurned.Core
                     return false;
                 }
 
-                // Already learned -> no re-buy.
+                // Already learned -> no re-buy. (Re-clicking a learned cell is a no-op even in DEV mode;
+                // recruit a fresh Arthron to retest a cell from scratch.)
                 if (character.Progression.Abilities.Contains(ability))
                 {
-                    return false;
-                }
-
-                // LEVEL GATE: adjusted level (skips the dual-spec spacer) == "cell N at level N".
-                int requiredLevel = UICharacterProgressionUtl.GetAbilityAdjustedLevel(character, slot, skipDualSpec: true);
-                int charLevel = character.Progression.LevelProgression.Level;
-                if (charLevel < requiredLevel)
-                {
-                    TheTurnedMain.LogInfo($"[TheTurned] CellBuy: '{ability.name}' locked (needs level {requiredLevel}, char level {charLevel}).");
                     return false;
                 }
 
@@ -133,6 +125,31 @@ namespace TheTurned.Core
                 if (module == null)
                 {
                     TheTurnedMain.LogWarn("[TheTurned] CellBuy: UIModuleCharacterProgression not found — purchase aborted.");
+                    return false;
+                }
+
+                // DEV-TESTING: when DevUnlockAllLevels is on, every top cell is unlocked AND FREE — skip the
+                // level gate, the affordance check, and the SkillPoint deduction; just learn it (AddAbility
+                // still fires OnAbilityAdded so armor/stat effects apply) and refresh the panel. Lets the user
+                // click each cell to preview its model effect without spending SP.
+                if (Phase4.DevUnlockAllLevels)
+                {
+                    character.Progression.AddAbility(ability);
+                    RefreshPanel(module);
+                    TheTurnedMain.LogInfo($"[TheTurned] CellBuy(DEV-FREE): learned '{ability.name}' (no cost) on '{character.GetName()}'.");
+                    return false;
+                }
+
+                // REAL purchase path (DevUnlockAllLevels == false). DevUnlockAllLevels is a compile-time const,
+                // so while it is true this block const-folds to unreachable; the pragma keeps the build clean
+                // and the code reactivates verbatim when the const is flipped to false (the real Chunk-B path).
+#pragma warning disable CS0162 // Unreachable code (const-folded DevUnlockAllLevels free-mode switch — intentional)
+                // LEVEL GATE: adjusted level (skips the dual-spec spacer) == "cell N at level N".
+                int requiredLevel = UICharacterProgressionUtl.GetAbilityAdjustedLevel(character, slot, skipDualSpec: true);
+                int charLevel = character.Progression.LevelProgression.Level;
+                if (charLevel < requiredLevel)
+                {
+                    TheTurnedMain.LogInfo($"[TheTurned] CellBuy: '{ability.name}' locked (needs level {requiredLevel}, char level {charLevel}).");
                     return false;
                 }
 
@@ -163,17 +180,25 @@ namespace TheTurned.Core
 
                 // COMMIT + REFRESH: flush SP to progression/faction, rebuild the panel (BuyAbility :422,436,437).
                 module.CommitStatChanges();
-                module.RefreshStatPanel();
-                SetAbilityTracksMethod.Invoke(module, null);
+                RefreshPanel(module);
 
                 TheTurnedMain.LogInfo($"[TheTurned] CellBuy: learned '{ability.name}' for {cost} SP (now SP {sp} + faction {fp}) on '{character.GetName()}'.");
                 return false;
+#pragma warning restore CS0162
             }
             catch (Exception e)
             {
                 TheTurnedMain.LogWarn("[TheTurned] CellRowPurchasePatch prefix threw (falling back to vanilla): " + e);
                 return true;
             }
+        }
+
+        // Rebuild the progression panel after a learn (mirrors BuyAbility :436-437): public RefreshStatPanel
+        // + the private SetAbilityTracks (reflected) so the cell flips to "learned" and counters update.
+        private static void RefreshPanel(UIModuleCharacterProgression module)
+        {
+            module.RefreshStatPanel();
+            SetAbilityTracksMethod.Invoke(module, null);
         }
 
         // Open the augment/Bionics screen via the same public entry the DNA button uses
