@@ -158,6 +158,9 @@ namespace TheTurned
             {
                 CrabmanParts.Build(repo);
                 Monsters.Arthron.ArthronMonster.BuildPhase4Rows(repo);
+                // V1 Phase-2 augment screen: make Crabman head/arm variant bodyparts eligible as Bionics
+                // cards (BionicalTag + zero cost) and resolve the Crabman augment slot defs. Idempotent.
+                AugmentVariants.Prepare(repo);
             }
         }
     }
