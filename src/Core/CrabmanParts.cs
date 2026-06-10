@@ -247,21 +247,40 @@ namespace TheTurned.Core
             {
                 return;
             }
-            // Base Humanoid head bodypart = the non-Elite, hand-null head set's bodypart (DefaultHead).
-            TacticalItemDef baseHumanoid = DefaultHead?.BodyPart
+            // The head CARDS are ALL authored clones (each owns a private VED so RebindNames never mutates a
+            // real enemy head VED, and base is listed exactly once). The card pool filter
+            // (AugmentVariants.AllVariantBodyparts) keeps only "TheTurned_Crabman_Head_*" for the head slot.
+            //   1. BASE    = clone of the real Humanoid head (same SkinData/look), no spit, no armor bump.
+            //   2. SPITTER = clone of the Humanoid head + the native Spitter weapon (poison spit; same skull).
+            //   3. ARMORED = clone of the real ELITEHUMANOID head (its OWN distinct armored SkinData — the
+            //      real carapace model TFTV assigns to the UltraShielder), NOT a Humanoid+Armor clone (that
+            //      reuses the base SkinData and renders identical — appearance = SkinData, Armor is a stat).
+            // Real defs resolved by exact name (bundle GUIDs unknown); the recruit still equips the REAL
+            // chassis Humanoid head via ApplyNakedBase — unaffected by these card clones.
+            TacticalItemDef baseHumanoid = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Head_Humanoid_BodyPartDef")
+                ?? DefaultHead?.BodyPart
                 ?? NonElite(HeadSets).FirstOrDefault(s => s.Hand == null)?.BodyPart;
             if (baseHumanoid == null)
             {
                 TheTurnedMain.LogWarn("[TheTurned] authored heads: base Humanoid head bodypart unresolved — skipped");
                 return;
             }
-            // Native non-Elite spitter head weapon (acid/poison spit).
+            TacticalItemDef eliteHumanoid = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Head_EliteHumanoid_BodyPartDef");
+            // Native non-Elite spitter head weapon (poison spit).
             WeaponDef spitterWeapon = NonElite(HeadSets)
                 .Where(s => s.Hand != null && s.Hand.name.IndexOf("Spitter", StringComparison.OrdinalIgnoreCase) >= 0)
                 .Select(s => s.Hand)
                 .FirstOrDefault();
 
-            // -- Spitter card -----------------------------------------------------------------------
+            // -- BASE card (clone Humanoid; own VED; no spit) ---------------------------------------
+            TacticalItemDef baseBody = CloneHeadBodypart(repo,
+                baseHumanoid, "head:authored:Humanoid", "TheTurned_Crabman_Head_Humanoid_BodyPartDef", armorBonus: 0f);
+            if (baseBody != null)
+            {
+                HeadSets.Add(new MatchedSet { BodyPart = baseBody, Hand = null, IsRight = false, Token = "Humanoid" });
+            }
+
+            // -- SPITTER card (clone Humanoid + spitter weapon) -------------------------------------
             if (spitterWeapon != null)
             {
                 TacticalItemDef spitterBody = CloneHeadBodypart(repo,
@@ -276,9 +295,15 @@ namespace TheTurned.Core
                 TheTurnedMain.LogWarn("[TheTurned] authored heads: native spitter head weapon unresolved — Spitter card skipped");
             }
 
-            // -- Armored head card ------------------------------------------------------------------
+            // -- ARMORED card (clone of the REAL EliteHumanoid head -> distinct armored model) -------
+            TacticalItemDef armoredSource = eliteHumanoid ?? baseHumanoid;
+            if (eliteHumanoid == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored heads: 'Crabman_Head_EliteHumanoid_BodyPartDef' not found — "
+                    + "Armored card falls back to a Humanoid clone (will LOOK like base; appearance = SkinData).");
+            }
             TacticalItemDef armoredBody = CloneHeadBodypart(repo,
-                baseHumanoid, "head:authored:Armored", "TheTurned_Crabman_Head_Armored_BodyPartDef", armorBonus: ArmoredHeadArmorBonus);
+                armoredSource, "head:authored:Armored", "TheTurned_Crabman_Head_Armored_BodyPartDef", armorBonus: ArmoredHeadArmorBonus);
             if (armoredBody != null)
             {
                 HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });

@@ -54,7 +54,14 @@ namespace TheTurned.Core
         /// <see cref="CrabmanParts.BaseTier"/>. Head pool = Humanoid(base) + Spitter + Armored (the last two
         /// are authored clone bodyparts, see CrabmanParts.BuildAuthoredHeadVariants).</summary>
         internal static IEnumerable<TacticalItemDef> AllVariantBodyparts =>
+            // HEAD cards = ONLY the authored clones (TheTurned_Crabman_Head_*): Base / Spitter / Armored,
+            // each with its OWN VED. This excludes the real Crabman_Head_Humanoid / EliteHumanoid / native-
+            // spitter-set bodyparts from the card pool, so (a) base is listed exactly once and (b)
+            // RebindNames NEVER mutates a live enemy head ViewElementDef. The real heads stay equippable
+            // (recruit equips the real chassis Humanoid via ApplyNakedBase) — just not as cards.
             CrabmanParts.BaseTier(CrabmanParts.HeadSets)
+                .Where(s => s.BodyPart != null
+                    && s.BodyPart.name.StartsWith("TheTurned_Crabman_Head_", StringComparison.Ordinal))
                 // The plain left arm (Crabman_LeftArm_BodyPartDef, empty token) is the recruit's equipped
                 // DEFAULT — it must NOT appear as a selectable card. Left cards = {Shield, Grenade,
                 // Acid_Grenade}. Exclude the bare arm here (it stays equippable, just not a card).
