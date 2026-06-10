@@ -61,6 +61,7 @@ namespace TheTurned
             // GeoPhoenixpedia NRE when a crab item is moved to storage. All idempotent + recruit-scoped.
             BionicsSectionPatch.Apply((Harmony)HarmonyInstance);
             BionicsUnlockBypass.Apply((Harmony)HarmonyInstance);
+            BionicsSlotInitGuard.Apply((Harmony)HarmonyInstance);
             BionicsApplyPatch.Apply((Harmony)HarmonyInstance);
             PediaNreGuard.Apply((Harmony)HarmonyInstance);
 

@@ -1,4 +1,5 @@
 using HarmonyLib;
+using I2.Loc;
 using PhoenixPoint.Common.View.ViewModules;
 using PhoenixPoint.Geoscape.Entities;
 using PhoenixPoint.Geoscape.View.ViewModules;
@@ -41,6 +42,11 @@ namespace TheTurned.Core
         // Per-section saved native slot (so we can restore for humans). Keyed by the section instance.
         private static readonly Dictionary<UIModuleMutationSection, ItemSlotDef> _originalSlot =
             new Dictionary<UIModuleMutationSection, ItemSlotDef>();
+        // Per-section header Localize + its saved native term (so the human header is restored on cycle).
+        private static readonly Dictionary<UIModuleMutationSection, Localize> _headerLoc =
+            new Dictionary<UIModuleMutationSection, Localize>();
+        private static readonly Dictionary<UIModuleMutationSection, string> _originalHeaderTerm =
+            new Dictionary<UIModuleMutationSection, string>();
 
         internal static void Apply(Harmony harmony)
         {
@@ -80,6 +86,7 @@ namespace TheTurned.Core
                         TheTurnedMain.LogWarn("[TheTurned] BionicsSectionPatch: recruit selected but AugmentVariants not ready — sections NOT retargeted.");
                         return;
                     }
+                    AugmentVariants.EnsureFree(); // re-assert FREE cost each open (defensive vs reload rebuilds)
                     retargetChanged = RetargetToCrabman(sections);
                 }
                 else
@@ -149,6 +156,8 @@ namespace TheTurned.Core
                     TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' retargeted "
                         + $"'{nativeSlot?.name}'({nativeSlot?.SlotName}) -> '{crab.name}'({crab.SlotName}).");
                 }
+                // Relabel the section header to our Голова / Левая рука / Правая рука (recruit only).
+                SetSectionHeader(section, AugmentVariants.HeaderKeyForSlot(crab));
             }
             return changed;
         }
@@ -170,8 +179,72 @@ namespace TheTurned.Core
                     changed = true;
                     TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' restored to native '{native.name}'({native.SlotName}).");
                 }
+                RestoreSectionHeader(section); // put the native header term back for humans
             }
             return changed;
+        }
+
+        /// <summary>
+        /// Find the section's header <see cref="Localize"/> (lazily, once) and set it to our loc key. The
+        /// header is a static prefab Text/Localize child NOT among the script's preview-panel Localize fields
+        /// (MutationNameLoc / MutationDescriptionLoc / MutationLockedLoc) — pick the first other Localize in
+        /// the subtree. The native term is saved so humans are restored on cycle.
+        /// </summary>
+        private static void SetSectionHeader(UIModuleMutationSection section, string headerKey)
+        {
+            if (section == null || string.IsNullOrEmpty(headerKey))
+            {
+                return;
+            }
+            Localize header = ResolveHeaderLoc(section);
+            if (header == null)
+            {
+                return;
+            }
+            if (!_originalHeaderTerm.ContainsKey(section))
+            {
+                _originalHeaderTerm[section] = header.Term; // remember the native term, once
+            }
+            if (header.Term != headerKey)
+            {
+                header.SetTerm(headerKey);
+                TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' header -> '{headerKey}'.");
+            }
+        }
+
+        private static void RestoreSectionHeader(UIModuleMutationSection section)
+        {
+            if (section == null || !_headerLoc.TryGetValue(section, out Localize header) || header == null)
+            {
+                return;
+            }
+            if (_originalHeaderTerm.TryGetValue(section, out string native) && !string.IsNullOrEmpty(native)
+                && header.Term != native)
+            {
+                header.SetTerm(native);
+            }
+        }
+
+        /// <summary>The header Localize for a section = the first Localize in its subtree that is NOT one of the
+        /// known preview-panel Localize fields. Cached per section.</summary>
+        private static Localize ResolveHeaderLoc(UIModuleMutationSection section)
+        {
+            if (_headerLoc.TryGetValue(section, out Localize cached))
+            {
+                return cached;
+            }
+            var exclude = new HashSet<Localize>();
+            if (section.MutationNameLoc != null) exclude.Add(section.MutationNameLoc);
+            if (section.MutationDescriptionLoc != null) exclude.Add(section.MutationDescriptionLoc);
+            if (section.MutationLockedLoc != null) exclude.Add(section.MutationLockedLoc);
+            Localize header = section.GetComponentsInChildren<Localize>(true)
+                .FirstOrDefault(l => l != null && !exclude.Contains(l));
+            _headerLoc[section] = header; // cache (may be null — then we just skip header relabel)
+            if (header == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] BionicsSectionPatch: no header Localize found on section '{section.name}' — header not relabeled.");
+            }
+            return header;
         }
     }
 }
