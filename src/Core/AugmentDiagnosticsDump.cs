@@ -2,9 +2,11 @@ using Base.Defs;
 using Base.Entities.Abilities;
 using HarmonyLib;
 using PhoenixPoint.Common.Entities.Addons;
+using PhoenixPoint.Common.Entities.Characters;
 using PhoenixPoint.Common.Entities.Items;
 using PhoenixPoint.Common.UI;
 using PhoenixPoint.Geoscape.View.ViewModules;
+using PhoenixPoint.Tactical.Entities;
 using PhoenixPoint.Tactical.Entities.Abilities;
 using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
@@ -127,6 +129,133 @@ namespace TheTurned.Core
             //     which parts SHARE a model (look identical) vs are visually distinct. Feeds the body-part
             //     catalog (docs/research/crabman-bodypart-catalog.md).
             DumpAppearance(repo);
+
+            // (g) BACK-PLATE hunt #1: SubAddons riding on the TORSO + the 4 LEG defs (the mesh that holds
+            //     the visible back plate is most likely a sub-addon of one of these). Read-only.
+            DumpTorsoLegSubAddons(repo);
+
+            // (h) BACK-PLATE hunt #2: per-strain loadouts — which torso/leg defs each Crabman strain tier
+            //     equips (Data.BodypartItems + ComponentSetDef CharacterBodyStateDef.BodyPartsDefs). Read-only.
+            DumpPerStrainLoadouts(repo);
+
+            // (i) BACK-PLATE hunt #3: EVERY Crabman-prefixed TacticalItemDef (no narrow name filter) + slot
+            //     bind — catches a back/carapace/plate def hiding under a non-obvious name. Read-only.
+            DumpAllCrabmanItemDefs(repo);
+        }
+
+        /// <summary>(g) Torso + 4 leg defs: recursively dump each one's SubAddons wiring — name, SkinData type +
+        /// NormalPrefab/runtimeKey (via the shared <see cref="DumpAssetReferenceKeys"/> reflector), WeakAddon flag,
+        /// RequiredSlotBinds, ProvidedSlots. Reveals any back-plate addon attached to the torso/legs.</summary>
+        private static void DumpTorsoLegSubAddons(DefRepository repo)
+        {
+            string[] names =
+            {
+                "Crabman_Torso_BodyPartDef",
+                "Crabman_Legs_Agile_ItemDef",
+                "Crabman_Legs_Armoured_ItemDef",
+                "Crabman_Legs_EliteAgile_ItemDef",
+                "Crabman_Legs_EliteArmoured_ItemDef",
+            };
+            TheTurnedMain.LogInfo($"[TheTurned] DUMP torso/leg SubAddons ({names.Length} target defs):");
+            foreach (string n in names)
+            {
+                AddonDef root = DefUtils.ResolveByName<TacticalItemDef>(repo, n);
+                if (root == null)
+                {
+                    TheTurnedMain.LogInfo($"  TARGET '{n}' = <not resolved>");
+                    continue;
+                }
+                TheTurnedMain.LogInfo($"  TARGET '{root.name}' type={root.GetType().Name}");
+                DumpAddonRecursive("    ", root, 0);
+            }
+        }
+
+        /// <summary>Recursively log an addon + its SubAddons (the back-plate is most likely a leaf sub-addon).</summary>
+        private static void DumpAddonRecursive(string indent, AddonDef addon, int depth)
+        {
+            if (addon == null || depth > 6)
+            {
+                return;
+            }
+            string skinType = addon.SkinData != null ? addon.SkinData.GetType().Name : "<null>";
+            string skinName = addon.SkinData != null ? addon.SkinData.name : "<null>";
+            TheTurnedMain.LogInfo($"{indent}addon='{addon.name}' weak={addon.WeakAddon} skinType={skinType} skin='{skinName}' "
+                + $"required=[{RequiredBindsToString(addon)}] provided=[{ProvidedSlotsToString(addon)}]");
+            // SkinData asset-reference RuntimeKeys (NormalPrefab/mesh identity) — same accessor as the arm dump.
+            DumpAssetReferenceKeys($"{indent}  skin", addon.SkinData);
+
+            AddonDef.SubaddonBind[] subs = addon.SubAddons;
+            if (subs == null || subs.Length == 0)
+            {
+                return;
+            }
+            TheTurnedMain.LogInfo($"{indent}  subAddons ({subs.Length}):");
+            foreach (AddonDef.SubaddonBind sb in subs)
+            {
+                AddonDef child = sb.SubAddon;
+                TheTurnedMain.LogInfo($"{indent}    sub='{child?.name ?? "<null>"}' attachPoint='{sb.AttachmentPointName ?? "<null>"}'");
+                DumpAddonRecursive(indent + "      ", child, depth + 1);
+            }
+        }
+
+        /// <summary>(h) For every Crabman-named TacCharacterDef (strain tiers): dump its Data.BodypartItems names
+        /// AND its ComponentSetDef CharacterBodyStateDef.BodyPartsDefs names — shows which torso/leg each strain
+        /// equips and whether evolved strains inject a back-plate the base lacks.</summary>
+        private static void DumpPerStrainLoadouts(DefRepository repo)
+        {
+            var strains = repo.GetAllDefs<TacCharacterDef>()
+                .Where(d => d?.name != null && d.name.IndexOf("Crabman", StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderBy(d => d.name, StringComparer.Ordinal).ToList();
+            TheTurnedMain.LogInfo($"[TheTurned] DUMP per-strain loadouts: Crabman TacCharacterDefs ({strains.Count}):");
+            foreach (TacCharacterDef cd in strains)
+            {
+                ItemDef[] bodyparts = cd.Data?.BodypartItems;
+                string bpItems = bodyparts == null || bodyparts.Length == 0
+                    ? "<none>"
+                    : string.Join(", ", bodyparts.Select(i => "'" + (i?.name ?? "<null>") + "'"));
+                CharacterBodyStateDef bodyState = cd.ComponentSetDef?.GetComponentDef<CharacterBodyStateDef>();
+                ItemDef[] stateParts = bodyState?.BodyPartsDefs;
+                string statePartsStr = stateParts == null || stateParts.Length == 0
+                    ? "<none>"
+                    : string.Join(", ", stateParts.Select(i => "'" + (i?.name ?? "<null>") + "'"));
+                TheTurnedMain.LogInfo($"  STRAIN '{cd.name}'");
+                TheTurnedMain.LogInfo($"    Data.BodypartItems=[{bpItems}]");
+                TheTurnedMain.LogInfo($"    BodyState.BodyPartsDefs=[{statePartsStr}]");
+            }
+        }
+
+        /// <summary>(i) Every TacticalItemDef whose name starts with "Crabman" (drop the narrow head/arm/leg/torso
+        /// filter) + its slot bind — catches any back/carapace/plate def under a non-obvious name.</summary>
+        private static void DumpAllCrabmanItemDefs(DefRepository repo)
+        {
+            var all = repo.GetAllDefs<TacticalItemDef>()
+                .Where(d => d?.name != null && d.name.StartsWith("Crabman", StringComparison.Ordinal))
+                .OrderBy(d => d.name, StringComparer.Ordinal).ToList();
+            TheTurnedMain.LogInfo($"[TheTurned] DUMP all Crabman* TacticalItemDefs ({all.Count}):");
+            foreach (TacticalItemDef d in all)
+            {
+                TheTurnedMain.LogInfo($"  '{d.name}' type={d.GetType().Name} slots=[{SlotBindsToString(d)}]");
+            }
+        }
+
+        private static string RequiredBindsToString(AddonDef d)
+        {
+            AddonDef.RequiredSlotBind[] binds = d.RequiredSlotBinds;
+            if (binds == null || binds.Length == 0)
+            {
+                return "<none>";
+            }
+            return string.Join(", ", binds.Select(b => b.RequiredSlot?.name ?? "<null>"));
+        }
+
+        private static string ProvidedSlotsToString(AddonDef d)
+        {
+            AddonDef.ProvidedSlotBind[] binds = d.ProvidedSlots;
+            if (binds == null || binds.Length == 0)
+            {
+                return "<none>";
+            }
+            return string.Join(", ", binds.Select(b => (b.ProvidedSlot?.name ?? "<null>") + "@" + (b.AttachmentPointName ?? "<null>")));
         }
 
         /// <summary>Per Crabman part: VED display/icons, BodyPartAspectDef, SkinData type, and the RuntimeKey
