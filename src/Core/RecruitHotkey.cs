@@ -28,6 +28,17 @@ namespace TheTurned.Core
                     TurnedRecruiter.RecruitMonster(m);
                 }
             }
+
+            // TEMP M1 render-proof: Ctrl+Shift+Y cycles the recruit through two armor loadouts (A then B).
+            // REMOVE in M7 (plan 2026-06-10-cell-progression-v1.md, Task M7.1).
+            if (Input.GetKeyDown(KeyCode.Y))
+            {
+                var geo = Base.Core.GameUtl.CurrentLevel()?.GetComponent<PhoenixPoint.Geoscape.Levels.GeoLevelController>();
+                if (geo != null)
+                {
+                    CellDevDump.CycleArmorOnFirstRecruit(geo);
+                }
+            }
         }
     }
 }
