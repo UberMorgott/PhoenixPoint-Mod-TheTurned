@@ -247,16 +247,19 @@ namespace TheTurned.Core
             {
                 return;
             }
-            // The head CARDS are ALL authored clones (each owns a private VED so RebindNames never mutates a
-            // real enemy head VED, and base is listed exactly once). The card pool filter
-            // (AugmentVariants.AllVariantBodyparts) keeps only "TheTurned_Crabman_Head_*" for the head slot.
-            //   1. BASE    = clone of the real Humanoid head (same SkinData/look), no spit, no armor bump.
-            //   2. SPITTER = clone of the Humanoid head + the native Spitter weapon (poison spit; same skull).
-            //   3. ARMORED = clone of the real ELITEHUMANOID head (its OWN distinct armored SkinData — the
+            // The head CARDS are authored clones (each owns a private VED so RebindNames never mutates a real
+            // enemy head VED). Per the augment principle "the recruit SPAWNS the base part, the menu shows only
+            // SWAP options", the BASE head is NOT a card — the recruit spawns the real Humanoid head and the
+            // head menu offers only:
+            //   1. SPITTER = clone of the Humanoid head + the native Spitter weapon (poison spit; same skull).
+            //   2. ARMORED = clone of the real ELITEHUMANOID head (its OWN distinct armored SkinData — the
             //      real carapace model TFTV assigns to the UltraShielder), NOT a Humanoid+Armor clone (that
             //      reuses the base SkinData and renders identical — appearance = SkinData, Armor is a stat).
-            // Real defs resolved by exact name (bundle GUIDs unknown); the recruit still equips the REAL
-            // chassis Humanoid head via ApplyNakedBase — unaffected by these card clones.
+            // (Umbra head is INFEASIBLE — Umbra is a single-torso blob on its own rig with no head bodypart
+            // that binds the Crabman head slot; a possible tinted clone is under separate investigation.)
+            // The card pool filter (AugmentVariants.AllVariantBodyparts) keeps only "TheTurned_Crabman_Head_*"
+            // for the head slot. Real defs resolved by exact name (bundle GUIDs unknown); the recruit still
+            // equips the REAL chassis Humanoid head via ApplyNakedBase — unaffected by these card clones.
             TacticalItemDef baseHumanoid = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Head_Humanoid_BodyPartDef")
                 ?? DefaultHead?.BodyPart
                 ?? NonElite(HeadSets).FirstOrDefault(s => s.Hand == null)?.BodyPart;
@@ -272,13 +275,7 @@ namespace TheTurned.Core
                 .Select(s => s.Hand)
                 .FirstOrDefault();
 
-            // -- BASE card (clone Humanoid; own VED; no spit) ---------------------------------------
-            TacticalItemDef baseBody = CloneHeadBodypart(repo,
-                baseHumanoid, "head:authored:Humanoid", "TheTurned_Crabman_Head_Humanoid_BodyPartDef", armorBonus: 0f);
-            if (baseBody != null)
-            {
-                HeadSets.Add(new MatchedSet { BodyPart = baseBody, Hand = null, IsRight = false, Token = "Humanoid" });
-            }
+            // NOTE: no BASE head card — the recruit spawns the real Humanoid head; the menu shows only swaps.
 
             // -- SPITTER card (clone Humanoid + spitter weapon) -------------------------------------
             if (spitterWeapon != null)
