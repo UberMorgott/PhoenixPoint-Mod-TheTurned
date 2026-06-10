@@ -65,10 +65,14 @@ namespace TheTurned.Core
                     SetNativeButtonVisible(__instance.BionicsButton, false);
                 }
                 // Show DNA only for the recruit; hide it otherwise (humans untouched beyond their own button).
-                // The DNA clone is parented straight to the shared SoldierContextButtonsContainer (no per-button
-                // wrapper), so it MUST toggle its OWN GameObject — toggling its parent would disable every
-                // sibling button (Edit/Customize/Dismiss) for every character. See SetDnaButtonVisible.
-                SetDnaButtonVisible(AugmentButtonPatch.FindDnaButton(__instance), isRecruit);
+                // The DNA button now lives in its OWN cloned wrapper (clone of the bionics wrapper) inside the
+                // augment cluster. Toggle THAT wrapper — it is our object, so this never touches a shared
+                // container; consistent with the native parent-toggle.
+                GameObject dnaWrapper = AugmentButtonPatch.FindDnaWrapper(__instance);
+                if (dnaWrapper != null)
+                {
+                    dnaWrapper.SetActive(isRecruit);
+                }
             }
             catch (Exception e)
             {
@@ -91,18 +95,6 @@ namespace TheTurned.Core
             {
                 parent.gameObject.SetActive(isVisible);
             }
-        }
-
-        // DNA CLONE only: the clone is Instantiate(EditButton, controller.transform) — added straight to the
-        // shared SoldierContextButtonsContainer with NO per-button wrapper. Toggle its OWN GameObject; toggling
-        // the parent would disable the whole container (every sibling button) for every character.
-        private static void SetDnaButtonVisible(PhoenixGeneralButton button, bool isVisible)
-        {
-            if (button == null)
-            {
-                return;
-            }
-            button.gameObject.SetActive(isVisible);
         }
     }
 }
