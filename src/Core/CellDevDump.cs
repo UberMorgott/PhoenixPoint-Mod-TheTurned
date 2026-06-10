@@ -1,11 +1,15 @@
 using Base.Defs;
+using PhoenixPoint.Common.Entities.Characters;
 using PhoenixPoint.Common.Entities.Items;
 using PhoenixPoint.Geoscape.Entities;
 using PhoenixPoint.Geoscape.Levels;
+using PhoenixPoint.Geoscape.Levels.Factions;
+using PhoenixPoint.Geoscape.View.ViewModules;
 using PhoenixPoint.Tactical.Entities.Equipments;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace TheTurned.Core
 {
@@ -35,6 +39,54 @@ namespace TheTurned.Core
                 return;
             }
             ApplyVariant(recruit);
+        }
+
+        /// <summary>
+        /// TEMP dev action (Ctrl+Shift+U): add ONE level to the first Phase-4 recruit, exercising the REAL
+        /// auto-unlock-by-level mechanic. Grants the XP gap to the next level threshold via
+        /// LevelProgression.AddExperience [G LevelProgression.cs:78], which recomputes Level and fires
+        /// CharacterProgression.OnLevelUp -> SkillPoints += SkillpointsPerLevel [G CharacterProgression.cs:120-122].
+        /// One press = +1 level; no-op at MaxLevel. Works regardless of DevUnlockAllLevels (it only adds levels).
+        /// Refreshes the progression panel if open so the newly-unlocked cell shows. REMOVE with the other dev
+        /// keys at cleanup.
+        /// </summary>
+        internal static void LevelUpFirstRecruit(GeoLevelController geo)
+        {
+            if (geo?.PhoenixFaction == null || !Phase4.Enabled)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] DevLevelUp: no geoscape/PhoenixFaction or Phase4 off.");
+                return;
+            }
+            GeoCharacter recruit = geo.PhoenixFaction.Characters?.FirstOrDefault(Phase4.IsPhase4Recruit);
+            LevelProgression lp = recruit?.Progression?.LevelProgression;
+            if (lp == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] DevLevelUp: no marked recruit with a LevelProgression found.");
+                return;
+            }
+            if (lp.IsMaxLevel)
+            {
+                TheTurnedMain.LogInfo($"[TheTurned] DevLevelUp: '{recruit.GetName()}' already at MaxLevel ({lp.Def.MaxLevel}).");
+                return;
+            }
+
+            // XP gap to the NEXT level's cumulative threshold (TotalNextLevelExperience) [G LevelProgression.cs:33].
+            int gap = lp.TotalNextLevelExperience - lp.Experience;
+            if (gap < 1)
+            {
+                gap = 1;
+            }
+            int beforeLevel = lp.Level;
+            recruit.Progression.LevelProgression.AddExperience(gap); // -> OnLevelUp -> SkillPoints granted
+            TheTurnedMain.LogInfo($"[TheTurned] DevLevelUp: '{recruit.GetName()}' now level {lp.Level} "
+                + $"(was {beforeLevel}, XP={lp.Experience}, SP={recruit.Progression.SkillPoints}).");
+
+            // Refresh the open progression panel so the newly-unlocked cell visibly unlocks.
+            UIModuleCharacterProgression module = UnityEngine.Object.FindObjectOfType<UIModuleCharacterProgression>();
+            if (module != null && recruit.Faction is GeoPhoenixFaction phx)
+            {
+                module.SetCharacterProgression(phx, recruit);
+            }
         }
 
         private static void ApplyVariant(GeoCharacter recruit)

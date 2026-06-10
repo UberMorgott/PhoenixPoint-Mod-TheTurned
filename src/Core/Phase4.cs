@@ -13,8 +13,10 @@ namespace TheTurned.Core
         internal const string TftvModId = "phoenixrising.tftv";
 
         /// <summary>DEV: every Phase-4 recruit progression cell clickable/buyable at level 1
-        /// (see <see cref="DevUnlockPatch"/>). Flip false for release.</summary>
-        internal const bool DevUnlockAllLevels = true;
+        /// (see <see cref="DevUnlockPatch"/>). Flip false for release.
+        /// Currently FALSE to test the real auto-unlock-by-level gate (cell N at level N) + SP purchase; use the
+        /// Ctrl+Shift+U dev hotkey to level a recruit and watch cells unlock one per level.</summary>
+        internal const bool DevUnlockAllLevels = false;
 
         /// <summary>REV-2 2-row in-panel cell layout (top=5 SP/level Primary track, bottom=Mutagen Personal).
         /// When true, the recruit is routed to the HUMAN ability-track container (gate NOT OR'd into

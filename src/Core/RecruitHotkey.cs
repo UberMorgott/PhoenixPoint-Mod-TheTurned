@@ -39,6 +39,17 @@ namespace TheTurned.Core
                     CellDevDump.CycleArmorOnFirstRecruit(geo);
                 }
             }
+
+            // TEMP dev: Ctrl+Shift+U adds ONE level to the first Phase-4 recruit (real auto-unlock-by-level
+            // mechanic — grants XP -> level up -> SkillPoints). REMOVE with the other dev keys at cleanup.
+            if (Input.GetKeyDown(KeyCode.U))
+            {
+                var geo = Base.Core.GameUtl.CurrentLevel()?.GetComponent<PhoenixPoint.Geoscape.Levels.GeoLevelController>();
+                if (geo != null)
+                {
+                    CellDevDump.LevelUpFirstRecruit(geo);
+                }
+            }
         }
     }
 }

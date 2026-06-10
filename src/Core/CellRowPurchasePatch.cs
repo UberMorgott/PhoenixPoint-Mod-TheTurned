@@ -135,9 +135,11 @@ namespace TheTurned.Core
 
                 // DEV-TESTING: when DevUnlockAllLevels is on, every top cell is unlocked AND FREE — skip the
                 // level gate, the affordance check, and the SkillPoint deduction; just learn it (AddAbility
-                // still fires OnAbilityAdded so armor/stat effects apply) and refresh the panel. Lets the user
-                // click each cell to preview its model effect without spending SP.
-                if (Phase4.DevUnlockAllLevels)
+                // still fires OnAbilityAdded so armor/stat effects apply) and refresh the panel. Read the const
+                // into a local so neither branch const-folds to an unreachable-code (CS0162) warning whichever
+                // way the flag is set.
+                bool devFree = Phase4.DevUnlockAllLevels;
+                if (devFree)
                 {
                     character.Progression.AddAbility(ability);
                     RefreshPanel(module);
@@ -145,10 +147,7 @@ namespace TheTurned.Core
                     return false;
                 }
 
-                // REAL purchase path (DevUnlockAllLevels == false). DevUnlockAllLevels is a compile-time const,
-                // so while it is true this block const-folds to unreachable; the pragma keeps the build clean
-                // and the code reactivates verbatim when the const is flipped to false (the real Chunk-B path).
-#pragma warning disable CS0162 // Unreachable code (const-folded DevUnlockAllLevels free-mode switch — intentional)
+                // REAL purchase path (DevUnlockAllLevels == false): level gate + SP cost + deduction.
                 // LEVEL GATE: adjusted level (skips the dual-spec spacer) == "cell N at level N".
                 int requiredLevel = UICharacterProgressionUtl.GetAbilityAdjustedLevel(character, slot, skipDualSpec: true);
                 int charLevel = character.Progression.LevelProgression.Level;
@@ -189,7 +188,6 @@ namespace TheTurned.Core
 
                 TheTurnedMain.LogInfo($"[TheTurned] CellBuy: learned '{ability.name}' for {cost} SP (now SP {sp} + faction {fp}) on '{character.GetName()}'.");
                 return false;
-#pragma warning restore CS0162
             }
             catch (Exception e)
             {
