@@ -291,15 +291,36 @@ namespace TheTurned.Core
                     return;
                 }
                 DefRepository repo = DefUtils.Repo;
+                // Plain head BODYPART (no spit). The Crabby chassis occupies the head slot with the SPITTER
+                // WEAPON itself (Crabman_Head_Spitter_WeaponDef as the BodypartItems[0] head occupant) — there
+                // is NO separate Humanoid head bodypart in its items (proven by the BEFORE dump below + the
+                // "items 5 -> 4" headcount: removing the head weapon left the head slot EMPTY -> headless).
+                // So the naked base must explicitly ADD the plain Humanoid head bodypart, not merely strip spit.
+                TacticalItemDef plainHead = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Head_Humanoid_BodyPartDef");
                 TacticalItemDef plainLeft = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_LeftArm_BodyPartDef");
                 TacticalItemDef agileLegs = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Legs_Agile_ItemDef");
 
                 var list = new List<GeoItem>(geoChar.ArmourItems);
                 int before = list.Count;
 
-                // HEAD: drop any head WEAPON (e.g. the spitter) so the chassis Humanoid head has no spit.
-                list.RemoveAll(i => i?.ItemDef is WeaponDef && i.ItemDef.name != null
+                // EVIDENCE (one-shot per session): dump the chassis's FULL head-slot picture BEFORE we touch it,
+                // so a single Player.log pass proves exactly what occupies the head slot and what we change.
+                LogBodypartDumpOnce("naked base BEFORE", geoChar, list);
+
+                // HEAD: clear the whole head slot — any head WEAPON (the spitter) AND any head BODYPART — then
+                // add exactly the plain Humanoid head bodypart. Slot-clear-then-add (mirrors LEFT/LEGS) makes
+                // the result identical regardless of how the chassis structured its head, and is idempotent.
+                list.RemoveAll(i => i?.ItemDef?.name != null
                     && i.ItemDef.name.IndexOf("Crabman_Head", StringComparison.OrdinalIgnoreCase) >= 0);
+                if (plainHead != null)
+                {
+                    list.Add(new GeoItem(plainHead));
+                }
+                else
+                {
+                    Log?.LogWarning("[TheTurned] naked base: 'Crabman_Head_Humanoid_BodyPartDef' not found — "
+                        + "recruit may spawn HEADLESS.");
+                }
 
                 // LEFT arm: remove the existing left bodypart + any left hand weapon, add the plain arm.
                 list.RemoveAll(i => i?.ItemDef?.name != null
@@ -327,12 +348,40 @@ namespace TheTurned.Core
                 }
 
                 geoChar.SetItems(armour: list);
+                LogBodypartDumpOnce("naked base AFTER", geoChar, list);
                 Log?.LogInfo($"[TheTurned] naked base applied for '{geoChar.GetName()}' "
-                    + $"(items {before} -> {list.Count}; dropped spit head weapon, plain left arm, agile legs).");
+                    + $"(items {before} -> {list.Count}; set plain Humanoid head (no spit), plain left arm, agile legs).");
             }
             catch (Exception e)
             {
                 Log?.LogWarning("[TheTurned] ApplyNakedBase failed: " + e);
+            }
+        }
+
+        private static bool _bodypartDumpLogged;
+
+        /// <summary>One-shot-per-session diagnostic: dump each item in <paramref name="list"/> with its name +
+        /// whether it is a WeaponDef, so the head-slot occupant (bodypart vs weapon) is unambiguous in the log.</summary>
+        private static void LogBodypartDumpOnce(string tag, GeoCharacter geoChar, List<GeoItem> list)
+        {
+            if (_bodypartDumpLogged && tag.IndexOf("BEFORE", StringComparison.Ordinal) >= 0)
+            {
+                return; // gate only on BEFORE so a matched BEFORE/AFTER pair always prints together
+            }
+            if (list == null)
+            {
+                return;
+            }
+            string dump = string.Join(", ", list.Select(i =>
+            {
+                ItemDef d = i?.ItemDef;
+                if (d == null) { return "<null>"; }
+                return d.name + (d is WeaponDef ? " [WeaponDef]" : " [BodyPart]");
+            }));
+            Log?.LogInfo($"[TheTurned] {tag} for '{geoChar?.GetName()}' items({list.Count})=[{dump}]");
+            if (tag.IndexOf("AFTER", StringComparison.Ordinal) >= 0)
+            {
+                _bodypartDumpLogged = true; // close the one-shot only after the AFTER line prints
             }
         }
 
