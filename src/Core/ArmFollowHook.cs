@@ -46,6 +46,13 @@ namespace TheTurned.Core
                     // each to maxLevel+1 (idempotent, not gated on HasSets: the crash fix must apply
                     // even when arm sets failed to load).
                     SpecRowFactory.ReshapeRuntimeTracks(geoChar);
+                    // CHUNK A: re-host the 5 evolution cells in the SecondaryClass in-panel track on every
+                    // geoscape load so the top mutoid row keeps the cells across save/reload (the runtime
+                    // SecondaryClass track otherwise restores the original Gunner spec content). Overwrites
+                    // after the reshape; idempotent (rewrites the same cells). Arthron is the only recruit
+                    // with authored cells (the IsTurnedArthron gate above already scopes to turned recruits).
+                    SpecRowFactory.HostCellsInSecondaryTrack(geoChar,
+                        Monsters.Arthron.ArthronCellRow.BuildRowCells(DefUtils.Repo));
                     if (CrabmanParts.HasSets)
                     {
                         Subscribe(geoChar);

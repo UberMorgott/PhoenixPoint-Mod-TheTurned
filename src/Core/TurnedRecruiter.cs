@@ -81,6 +81,15 @@ namespace TheTurned.Core
                 {
                     // C1: popup-only progression. Keep slot 0 (class proficiency = identity), blank the rest.
                     geoChar.Progression?.ClearAbilityTrack(AbilityTrackSource.Personal, keepFirstAbility: true);
+                    // CHUNK A: host the 5 evolution cells in the SecondaryClass in-panel track (TOP mutoid row)
+                    // BEFORE the generic reshape, so the cells (already RowLength+1 with spacer) are skipped by
+                    // ReshapeRuntimeTracks (Length>=RowLength+1) and the OTHER runtime tracks still reshape.
+                    // Arthron-only this chunk (the sole recruit with authored cells).
+                    if (monster.Id == "Arthron")
+                    {
+                        SpecRowFactory.HostCellsInSecondaryTrack(geoChar,
+                            Monsters.Arthron.ArthronCellRow.BuildRowCells(DefUtils.Repo));
+                    }
                     // Runtime tracks (Personal born 7 slots, spec tracks = CloneSlots copies) — the
                     // mutoid container indexes slots[maxLevel], so reshape each to maxLevel+1.
                     SpecRowFactory.ReshapeRuntimeTracks(geoChar);

@@ -243,6 +243,39 @@ namespace TheTurned.Core
         }
 
         /// <summary>
+        /// CHUNK A: host the recruit's 5 evolution <paramref name="cells"/> in its SecondaryClass in-panel track
+        /// (the TOP visible mutoid row — RefreshAbilityTracks routes Source==SecondaryClass to the secondary
+        /// pool, AbilityTrackContainerElement.cs:154-156). Reshapes the 5 cells to RowLength+1 (8) with the
+        /// index-<see cref="SpacerIndex"/> (3) spacer — EXACTLY like <see cref="ReshapeRuntimeTracks"/> — so the
+        /// mutoid container's GetAbilitySlotForLevel (skips slot where i+1==SecondSpecializationLevel==4 → idx 3)
+        /// maps cell-index i to visible level i+1: levels 1-3 → cells 1-3 (idx 0-2), level 4 → cell 4 (idx 4),
+        /// level 5 → cell 5 (idx 5). Each slot's back-pointer is set via SetAbilityTrack (GetAbilityLevel needs
+        /// it). Idempotent: re-running rewrites the same cells. Returns true when the track was found + written.
+        /// </summary>
+        internal static bool HostCellsInSecondaryTrack(GeoCharacter geoChar, AbilityTrackSlot[] cells)
+        {
+            if (geoChar?.Progression?.AbilityTracks == null || cells == null || cells.Length == 0)
+            {
+                return false;
+            }
+            AbilityTrack secondary = geoChar.Progression.AbilityTracks
+                .FirstOrDefault(t => t != null && t.Source == AbilityTrackSource.SecondaryClass);
+            if (secondary == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] HostCells: no SecondaryClass runtime track for '{geoChar.GetName()}' — cells not hosted.");
+                return false;
+            }
+            secondary.AbilitiesByLevel = ReshapeWithSpacer(cells, totalLength: RowLength + 1, spacerIndex: SpacerIndex);
+            foreach (AbilityTrackSlot slot in secondary.AbilitiesByLevel)
+            {
+                slot.SetAbilityTrack(secondary);
+            }
+            TheTurnedMain.LogInfo($"[TheTurned] HostCells: {cells.Length} evolution cells hosted in the SecondaryClass "
+                + $"track ({secondary.AbilitiesByLevel.Length} slots, spacer@{SpacerIndex}) for '{geoChar.GetName()}'.");
+            return true;
+        }
+
+        /// <summary>
         /// Feed all built rows into <c>GeoPhoenixFaction.AvailablePandoranSpecialzations</c>.
         /// Idempotent (Contains-guarded); silent when nothing new was added (no log, no recruit scan).
         /// </summary>

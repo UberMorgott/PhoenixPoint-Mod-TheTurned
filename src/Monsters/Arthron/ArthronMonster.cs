@@ -145,64 +145,31 @@ namespace TheTurned.Monsters.Arthron
         /// </summary>
         internal static void BuildPhase4Rows(DefRepository repo)
         {
-            // Resolve the Arthron class tag ONCE (created by Tags.EnsureClassTag in BuildAllClasses).
-            ITurnedMonster arthron = MonsterRegistry.All.FirstOrDefault(m => m != null && m.Id == "Arthron");
-            ClassTagDef classTag = arthron != null ? Tags.GetClassTag(repo, arthron) : null;
+            // CHUNK A — COLLAPSE TO 2 IN-PANEL ROWS. The recruit's visible mutoid panel draws from
+            // Progression.AbilityTracks (SecondaryClass=top 5 evolution cells via
+            // SpecRowFactory.HostCellsInSecondaryTrack, Personal=bottom purple) — a DIFFERENT data source
+            // than the themed POPUP rows fed here into AvailablePandoranSpecialzations. So we STOP feeding the
+            // themed popup rows (no SpecRowFactory.GetOrCreateRow calls) to leave exactly 2 rows; the in-panel
+            // rows are untouched (investigation E1).
+            //
+            // We STILL call each *.BuildRowCells builder for its REGISTRATION SIDE EFFECTS (marker payloads
+            // other systems depend on): ArthronCellRow → CellArmorMarkers (cells 2/4 armor, M2),
+            // ArthronArmsRow → Phase4Markers arm SETs (ArthronArms.ApplyChosenSets), ArthronSurvivalPerks →
+            // LimbRestoreMarker (LimbRestoreHook). Bruiser/Gunner/Claw/Head builders have no external-static
+            // side effect (pure perk lists), so they're not needed for CHUNK A and are dropped from the feed.
+            // The results are discarded (not fed to the popup). Gated builders keep their resolve guards.
 
-            // ROW A — Bruiser: 5 design cells, padded to RowLength by the factory.
-            SpecRowFactory.GetOrCreateRow(repo, "Bruiser", "ARTHRON_ROW_BRUISER", "Arthron_Spec.png",
-                classTag, ArthronPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
-            // ROW B — Gunner: 6 design cells, padded to RowLength by the factory.
-            SpecRowFactory.GetOrCreateRow(repo, "Gunner", "ARTHRON_ROW_GUNNER", "ArthronGunner_Spec.png",
-                classTag, ArthronGunnerPerks.BuildRowCells(repo), fillerIcon: "ArthronGunner_Spec.png");
-            // ROW C — Arms: matched-SET marker cells (CrabmanParts.Build runs first — ModMain order).
-            // GATED on resolved sets: building early would bake 8 fillers into the track def PERMANENTLY
-            // (GetOrCreateRowTrack early-returns the existing def and never refreshes). Deferred rows
-            // appear on the first successful pass + the next FeedRows.
+            // Cell armor markers (cells 2/4) — also called at recruit/load time, idempotent here.
+            ArthronCellRow.BuildRowCells(repo);
+
+            // Arm-SET markers — required by ArthronArms.ApplyChosenSets / PerkOracle swaps.
             if (CrabmanParts.HasSets)
             {
-                SpecRowFactory.GetOrCreateRow(repo, "Arms", "ARTHRON_ROW_ARMS", "Arthron_ArmRight.png",
-                    classTag, ArthronArmsRow.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+                ArthronArmsRow.BuildRowCells(repo);
             }
-            else
-            {
-                TheTurnedMain.LogWarn("[TheTurned] arms row deferred — Crabman sets not resolved yet");
-            }
-            // ROW E — Claw Strikes: status-on-hit claw clones. Same gating rationale as Arms: building
-            // before the base claw resolves would bake a filler-only track PERMANENTLY.
-            if (CrabmanParts.DefaultRight?.Hand != null)
-            {
-                SpecRowFactory.GetOrCreateRow(repo, "Claw", "ARTHRON_ROW_CLAW", "Arthron_CrushingClaw.png",
-                    classTag, ArthronClawPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
-            }
-            else
-            {
-                TheTurnedMain.LogWarn("[TheTurned] claw row deferred — base claw weapon not resolved yet");
-            }
-            // ROW D — Head/Spray: native spitter set + keyword-clone variants. Gated on the SPITTER set
-            // specifically (not just HeadSets.Count) — same permanent-filler-bake rationale.
-            if (ArthronHeadPerks.FindSpitterSet() != null)
-            {
-                SpecRowFactory.GetOrCreateRow(repo, "Head", "ARTHRON_ROW_HEAD", "ArthronSpray_Acid.png",
-                    classTag, ArthronHeadPerks.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
-            }
-            else
-            {
-                TheTurnedMain.LogWarn("[TheTurned] head row deferred — Crabman spitter set not resolved yet");
-            }
-            // ROW F — Survival: immunities + limb-restore capstone. NOT gated like Arms/Claw/Head: its
-            // cells resolve from repo-global StatusDefs / ability defs (not bundle-timing-sensitive
-            // Crabman item defs), and each cell degrades individually (warn + PadRow filler).
-            // Runs every pass on purpose — refreshes the LimbRestoreMarker static read by LimbRestoreHook.
-            var survivalCells = ArthronSurvivalPerks.BuildRowCells(repo);
-            SpecRowFactory.GetOrCreateRow(repo, "Survival", "ARTHRON_ROW_SURVIVAL", "ArthronSurvival_Regen.png",
-                classTag, survivalCells, fillerIcon: "Arthron_Spec.png");
 
-            // ROW — Cell progression (top yellow 5-cell track). NOT gated on CrabmanParts.HasSets: the
-            // armor cells resolve their leg/torso/carapace defs lazily at apply time (CellArmorApply),
-            // and the stat/nav cells are repo-global. Runs every pass (idempotent get-or-create).
-            SpecRowFactory.GetOrCreateRow(repo, "Cell", "ARTHRON_ROW_CELL", "Arthron_Spec.png",
-                classTag, ArthronCellRow.BuildRowCells(repo), fillerIcon: "Arthron_Spec.png");
+            // Survival markers — refreshes the LimbRestoreMarker static read by LimbRestoreHook.
+            ArthronSurvivalPerks.BuildRowCells(repo);
         }
 
         private static bool HasCrabmanTag(TacCharacterDef def)
