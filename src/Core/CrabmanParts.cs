@@ -1,4 +1,6 @@
 using Base.Defs;
+using PhoenixPoint.Common.Entities.Addons;
+using PhoenixPoint.Common.Entities.Items;
 using PhoenixPoint.Common.UI;
 using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
@@ -247,19 +249,24 @@ namespace TheTurned.Core
             {
                 return;
             }
+            // AUGMENT-SCREEN PRINCIPLE: every card chooses a limb MODEL only. ALL augment parts run on BASE
+            // (ordinary) stats — no stat advantage. Where we use an EVOLVED (Elite) MODEL for a distinct look,
+            // we NORMALIZE its numeric stats down to the corresponding base part (looks evolved, hits base).
+            // Stat ranks + true ordinary->evolved upgrades are a SEPARATE future perk system, not this screen.
+            //
             // The head CARDS are authored clones (each owns a private VED so RebindNames never mutates a real
-            // enemy head VED). Per the augment principle "the recruit SPAWNS the base part, the menu shows only
-            // SWAP options", the BASE head is NOT a card — the recruit spawns the real Humanoid head and the
-            // head menu offers only:
-            //   1. SPITTER = clone of the Humanoid head + the native Spitter weapon (poison spit; same skull).
-            //   2. ARMORED = clone of the real ELITEHUMANOID head (its OWN distinct armored SkinData — the
-            //      real carapace model TFTV assigns to the UltraShielder), NOT a Humanoid+Armor clone (that
-            //      reuses the base SkinData and renders identical — appearance = SkinData, Armor is a stat).
-            // (Umbra head is INFEASIBLE — Umbra is a single-torso blob on its own rig with no head bodypart
-            // that binds the Crabman head slot; a possible tinted clone is under separate investigation.)
-            // The card pool filter (AugmentVariants.AllVariantBodyparts) keeps only "TheTurned_Crabman_Head_*"
-            // for the head slot. Real defs resolved by exact name (bundle GUIDs unknown); the recruit still
-            // equips the REAL chassis Humanoid head via ApplyNakedBase — unaffected by these card clones.
+            // enemy head VED). The recruit SPAWNS the real base Humanoid head; the head menu offers only swaps:
+            //   1. SPITTER       = clone of the base Humanoid head + the ordinary Spitter weapon (poison spit;
+            //                      same skull). Base stats already (clone of base).
+            //   2. ARMORED       = clone of the real EliteHumanoid head (its OWN distinct armored carapace
+            //                      SkinData, runtimeKey a9a243ad… ≠ base 122e5b8b…), stats NORMALIZED to base
+            //                      Humanoid (Armor/HP). No spit.
+            //   3. EVOLVED-SPITTER = clone of the EliteHumanoid head (armored skull MODEL) + a clone of the
+            //                      EliteSpitter weapon (evolved spit-organ MODEL) whose stats are normalized
+            //                      to the ordinary Spitter weapon. Distinct look = armored skull + evolved organ.
+            // (Umbra head INFEASIBLE — separate investigation.) CRITICAL headless-safe rule: clones add NO
+            // CustomizationColorTagDef / AlwaysCustomizeColor / mutually-exclusive GameTag (the prior headless
+            // crash). Clone = name + own VED + SkinData inherited from the Elite model + base-normalized stats.
             TacticalItemDef baseHumanoid = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Head_Humanoid_BodyPartDef")
                 ?? DefaultHead?.BodyPart
                 ?? NonElite(HeadSets).FirstOrDefault(s => s.Hand == null)?.BodyPart;
@@ -269,19 +276,18 @@ namespace TheTurned.Core
                 return;
             }
             TacticalItemDef eliteHumanoid = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_Head_EliteHumanoid_BodyPartDef");
-            // Native non-Elite spitter head weapon (poison spit).
+            // Ordinary (non-Elite) spitter head weapon (poison spit).
             WeaponDef spitterWeapon = NonElite(HeadSets)
                 .Where(s => s.Hand != null && s.Hand.name.IndexOf("Spitter", StringComparison.OrdinalIgnoreCase) >= 0)
                 .Select(s => s.Hand)
                 .FirstOrDefault();
+            WeaponDef eliteSpitterWeapon = DefUtils.ResolveByName<WeaponDef>(repo, "Crabman_Head_EliteSpitter_WeaponDef");
 
-            // NOTE: no BASE head card — the recruit spawns the real Humanoid head; the menu shows only swaps.
-
-            // -- SPITTER card (clone Humanoid + spitter weapon) -------------------------------------
+            // -- SPITTER card (clone base Humanoid + ordinary spitter weapon) -----------------------
             if (spitterWeapon != null)
             {
                 TacticalItemDef spitterBody = CloneHeadBodypart(repo,
-                    baseHumanoid, "head:authored:Spitter", "TheTurned_Crabman_Head_Spitter_BodyPartDef", armorBonus: 0f);
+                    baseHumanoid, baseHumanoid, "head:authored:Spitter", "TheTurned_Crabman_Head_Spitter_BodyPartDef");
                 if (spitterBody != null)
                 {
                     HeadSets.Add(new MatchedSet { BodyPart = spitterBody, Hand = spitterWeapon, IsRight = false, Token = "Spitter" });
@@ -289,10 +295,10 @@ namespace TheTurned.Core
             }
             else
             {
-                TheTurnedMain.LogWarn("[TheTurned] authored heads: native spitter head weapon unresolved — Spitter card skipped");
+                TheTurnedMain.LogWarn("[TheTurned] authored heads: ordinary spitter head weapon unresolved — Spitter card skipped");
             }
 
-            // -- ARMORED card (clone of the REAL EliteHumanoid head -> distinct armored model) -------
+            // -- ARMORED card (clone EliteHumanoid MODEL, stats normalized to base Humanoid) ---------
             TacticalItemDef armoredSource = eliteHumanoid ?? baseHumanoid;
             if (eliteHumanoid == null)
             {
@@ -300,63 +306,188 @@ namespace TheTurned.Core
                     + "Armored card falls back to a Humanoid clone (will LOOK like base; appearance = SkinData).");
             }
             TacticalItemDef armoredBody = CloneHeadBodypart(repo,
-                armoredSource, "head:authored:Armored", "TheTurned_Crabman_Head_Armored_BodyPartDef", armorBonus: ArmoredHeadArmorBonus);
+                armoredSource, baseHumanoid, "head:authored:Armored", "TheTurned_Crabman_Head_Armored_BodyPartDef");
             if (armoredBody != null)
             {
                 HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });
             }
 
+            // -- EVOLVED-SPITTER card (EliteHumanoid skull MODEL + normalized EliteSpitter organ MODEL) --
+            if (eliteHumanoid != null && eliteSpitterWeapon != null && spitterWeapon != null)
+            {
+                TacticalItemDef evolvedSpitterBody = CloneHeadBodypart(repo,
+                    eliteHumanoid, baseHumanoid, "head:authored:EvolvedSpitter",
+                    "TheTurned_Crabman_Head_Evolved_Spitter_BodyPartDef");
+                WeaponDef normalizedEliteSpit = WeaponVariants.GetOrCreateNormalizedWeapon(repo,
+                    eliteSpitterWeapon, spitterWeapon, "head:authored:EvolvedSpitter|weapon",
+                    "TheTurned_Crabman_Head_Evolved_Spitter_WeaponDef");
+                if (evolvedSpitterBody != null && normalizedEliteSpit != null)
+                {
+                    HeadSets.Add(new MatchedSet { BodyPart = evolvedSpitterBody, Hand = normalizedEliteSpit, IsRight = false, Token = "Evolved_Spitter" });
+                }
+                else
+                {
+                    TheTurnedMain.LogWarn("[TheTurned] authored heads: Evolved-Spitter clone/weapon unavailable — card skipped");
+                }
+            }
+            else
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored heads: EliteHumanoid or EliteSpitter weapon unresolved — Evolved-Spitter card skipped");
+            }
+
+            BuildAuthoredArmVariants(repo);
+
             _authoredHeadsBuilt = true;
         }
 
-        /// <summary>Extra armor added to the authored armored head bodypart (vanilla base head armor = 10).</summary>
-        private const float ArmoredHeadArmorBonus = 10f;
+        /// <summary>
+        /// Author the EVOLVED-CLAW right-arm card: a clone of the ElitePincer arm bodypart (its distinct
+        /// evolved-claw MODEL = SkinData, runtimeKey 269bc82d… ≠ base 3f099b87…) whose stats are NORMALIZED
+        /// to the base Pincer arm, paired with a clone of the ElitePincer HAND weapon whose damage/stats are
+        /// normalized to the base Pincer hand. The clone arm's SubAddons are REWRITTEN to attach the
+        /// normalized hand clone (preserving the original attachment point), so the engine auto-attaches the
+        /// evolved-claw hand-with-base-damage exactly like a native arm (BodypartCarriesHandSubaddon -> the
+        /// augment apply path treats it as native+SubAddon, no flat-hand conflict). LOOKS evolved, hits base.
+        /// Token "Evolved_Claw" (no "Pincer" substring) so the AllVariantBodyparts right filter keeps it as a
+        /// card while still excluding the base Pincer (recruit default). Idempotent (MD5-GUID guards).
+        /// </summary>
+        private static void BuildAuthoredArmVariants(DefRepository repo)
+        {
+            TacticalItemDef baseArm = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_RightArm_Pincer_BodyPartDef");
+            TacticalItemDef eliteArm = DefUtils.ResolveByName<TacticalItemDef>(repo, "Crabman_RightArm_ElitePincer_BodyPartDef");
+            WeaponDef baseHand = DefUtils.ResolveByName<WeaponDef>(repo, "Crabman_RightHand_Pincer_WeaponDef");
+            WeaponDef eliteHand = DefUtils.ResolveByName<WeaponDef>(repo, "Crabman_RightHand_ElitePincer_WeaponDef");
+            if (eliteArm == null || baseArm == null || eliteHand == null || baseHand == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] authored arm: Evolved-Claw defs unresolved "
+                    + $"(eliteArm={eliteArm != null} baseArm={baseArm != null} eliteHand={eliteHand != null} baseHand={baseHand != null}) — card skipped");
+                return;
+            }
+            // Normalized evolved-claw HAND (evolved mesh, base damage). Name keeps the RightHand side token
+            // (ArthronArms.SwapSet removal contract).
+            WeaponDef normalizedHand = WeaponVariants.GetOrCreateNormalizedWeapon(repo,
+                eliteHand, baseHand, "arm:authored:EvolvedClaw|hand",
+                "TheTurned_Crabman_RightHand_Evolved_Claw_WeaponDef");
+            if (normalizedHand == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored arm: Evolved-Claw hand clone failed — card skipped");
+                return;
+            }
+            // Normalized evolved-claw ARM bodypart (evolved skull/arm SkinData, base Armor/HP/aspect).
+            TacticalItemDef armBody = CloneArmBodypart(repo, eliteArm, baseArm, normalizedHand,
+                "arm:authored:EvolvedClaw", "TheTurned_Crabman_RightArm_Evolved_Claw_BodyPartDef");
+            if (armBody == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored arm: Evolved-Claw arm clone failed — card skipped");
+                return;
+            }
+            // Reference-guard: don't double-add across idempotent re-runs.
+            if (!RightArmSets.Any(s => s.BodyPart != null && s.BodyPart.Guid == armBody.Guid))
+            {
+                RightArmSets.Add(new MatchedSet { BodyPart = armBody, Hand = normalizedHand, IsRight = true, Token = "Evolved_Claw" });
+            }
+        }
 
-        /// <summary>Idempotent clone of a head bodypart def with an optional armor bonus (ItemDef.Armor [G]).</summary>
-        private static TacticalItemDef CloneHeadBodypart(DefRepository repo, TacticalItemDef source,
-            string guidSeed, string cloneName, float armorBonus)
+        /// <summary>Idempotent clone of a head bodypart def: keep the model source's SkinData, normalize stats to base.</summary>
+        private static TacticalItemDef CloneHeadBodypart(DefRepository repo, TacticalItemDef modelSource,
+            TacticalItemDef baseStats, string guidSeed, string cloneName)
         {
             string guid = Phase4.DeriveGuid(guidSeed).ToString();
             if (repo.GetDef(guid) is TacticalItemDef existing)
             {
                 return existing;
             }
-            TacticalItemDef clone = repo.CreateDef<TacticalItemDef>(guid, source);
+            TacticalItemDef clone = repo.CreateDef<TacticalItemDef>(guid, modelSource);
             if (clone == null)
             {
                 TheTurnedMain.LogWarn($"[TheTurned] authored heads: clone failed for '{cloneName}'");
                 return null;
             }
             clone.name = cloneName;
-            // SkinData (the 3D model/prefab) is intentionally NOT touched here — CreateDef copies the
+            // SkinData (the 3D model/prefab) is intentionally NOT touched — CreateDef copies the model
             // source's SkinData by reference, so an EliteHumanoid clone keeps EliteHumanoid's armored prefab
-            // (runtimeKey a9a243ad…, confirmed distinct from base Humanoid 122e5b8b…) and renders armored.
-            if (armorBonus > 0f)
+            // (runtimeKey a9a243ad…, distinct from base Humanoid 122e5b8b…) and renders armored.
+            // Stats NORMALIZED to base (augment principle: evolved look, ordinary mechanics).
+            NormalizeBodypartStats(clone, baseStats);
+            GiveOwnVed(repo, clone, modelSource, guidSeed, cloneName);
+            return clone;
+        }
+
+        /// <summary>Copy the ordinary stat fields FROM <paramref name="baseStats"/> onto <paramref name="clone"/>
+        /// (the evolved-MODEL clone), so it is mechanically identical to base while keeping the evolved SkinData.
+        /// Fields per crabman-bodypart-catalog §0: ItemDef.Armor/HitPoints/Weight + TacticalItemDef.BodyPartAspectDef.</summary>
+        private static void NormalizeBodypartStats(TacticalItemDef clone, TacticalItemDef baseStats)
+        {
+            if (clone == null || baseStats == null)
             {
-                clone.Armor = source.Armor + armorBonus;
+                return;
             }
-            // CRITICAL: give the clone its OWN ViewElementDef. Unity's CreateDef deep-copies the ItemDef but
-            // copies the ViewElementDef as a shared REFERENCE — so the base Humanoid head + both authored
-            // clones would share ONE VED, and AugmentVariants.RebindNames (called per card) would have the
-            // LAST write win for all three (verified: all heads showed "Armored Head"), and would corrupt
-            // the real enemy Humanoid head's VED. Clone the VED (non-generic CreateDef preserves its runtime
-            // type) so each authored head owns its name/description independently.
-            ViewElementDef srcVed = source.ViewElementDef;
-            if (srcVed != null)
+            clone.Armor = baseStats.Armor;
+            clone.HitPoints = baseStats.HitPoints;
+            clone.Weight = baseStats.Weight;
+            clone.BodyPartAspectDef = baseStats.BodyPartAspectDef;
+        }
+
+        /// <summary>Give <paramref name="clone"/> its OWN cloned ViewElementDef (Unity's CreateDef copies the
+        /// VED as a shared REFERENCE, so every clone + the real enemy part would otherwise share one VED and
+        /// RebindNames' last-write would win for all + corrupt the live enemy VED). Headless-safe: only the
+        /// VED name is set — no color tag / customization flag is touched.</summary>
+        private static void GiveOwnVed(DefRepository repo, ItemDef clone, ItemDef modelSource, string guidSeed, string cloneName)
+        {
+            ViewElementDef srcVed = modelSource?.ViewElementDef;
+            if (srcVed == null)
             {
-                string vedGuid = Phase4.DeriveGuid(guidSeed + "|ved").ToString();
-                ViewElementDef newVed = repo.GetDef(vedGuid) as ViewElementDef
-                    ?? repo.CreateDef(vedGuid, srcVed) as ViewElementDef;
-                if (newVed != null)
+                return;
+            }
+            string vedGuid = Phase4.DeriveGuid(guidSeed + "|ved").ToString();
+            ViewElementDef newVed = repo.GetDef(vedGuid) as ViewElementDef
+                ?? repo.CreateDef(vedGuid, srcVed) as ViewElementDef;
+            if (newVed != null)
+            {
+                newVed.name = "E_ViewElement [" + cloneName + "]";
+                clone.ViewElementDef = newVed;
+            }
+            else
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] authored clone: VED clone failed for '{cloneName}' — "
+                    + "card may share the source part's name.");
+            }
+        }
+
+        /// <summary>Idempotent clone of an arm bodypart: keep the evolved-model SkinData, normalize stats to
+        /// <paramref name="baseStats"/>, give it its own VED, and REWRITE its SubAddons so the matched hand
+        /// auto-attaches the supplied <paramref name="hand"/> clone (preserving the original attachment point).
+        /// Headless-safe: no color/customization tag added.</summary>
+        private static TacticalItemDef CloneArmBodypart(DefRepository repo, TacticalItemDef modelSource,
+            TacticalItemDef baseStats, WeaponDef hand, string guidSeed, string cloneName)
+        {
+            string guid = Phase4.DeriveGuid(guidSeed).ToString();
+            if (repo.GetDef(guid) is TacticalItemDef existing)
+            {
+                return existing;
+            }
+            TacticalItemDef clone = repo.CreateDef<TacticalItemDef>(guid, modelSource);
+            if (clone == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] authored arm: clone failed for '{cloneName}'");
+                return null;
+            }
+            clone.name = cloneName;
+            NormalizeBodypartStats(clone, baseStats);
+            GiveOwnVed(repo, clone, modelSource, guidSeed, cloneName);
+            // Rewrite the SubAddon hand -> the normalized hand clone (keep attachment point of the first
+            // hand SubAddon). The native ElitePincer arm carries its Elite hand as a SubAddon; pointing it at
+            // our normalized clone makes the engine auto-attach the evolved-claw mesh with base damage, and
+            // makes ArthronArms.BodypartCarriesHandSubaddon true (apply path = native+SubAddon, no flat-hand
+            // conflict). If the source had no SubAddons, add one.
+            if (hand != null)
+            {
+                AddonDef.SubaddonBind[] subs = clone.SubAddons;
+                string attach = (subs != null && subs.Length > 0) ? subs[0].AttachmentPointName : null;
+                clone.SubAddons = new[]
                 {
-                    newVed.name = "E_ViewElement [" + cloneName + "]";
-                    clone.ViewElementDef = newVed;
-                }
-                else
-                {
-                    TheTurnedMain.LogWarn($"[TheTurned] authored heads: VED clone failed for '{cloneName}' — "
-                        + "card may share the base head's name.");
-                }
+                    new AddonDef.SubaddonBind { SubAddon = hand, AttachmentPointName = attach }
+                };
             }
             return clone;
         }

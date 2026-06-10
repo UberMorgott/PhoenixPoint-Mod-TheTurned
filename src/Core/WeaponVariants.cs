@@ -70,5 +70,51 @@ namespace TheTurned.Core
             });
             return clone;
         }
+
+        /// <summary>
+        /// Idempotently clone an EVOLVED-model weapon <paramref name="eliteSource"/> (so the clone keeps the
+        /// evolved 3D model = AddonDef.SkinData + its ability/organ visuals) but NORMALIZE every numeric
+        /// combat stat down to the ordinary <paramref name="baseStats"/> weapon, so it LOOKS evolved yet
+        /// hits exactly like base. Copies from base: DamagePayload (damage/range/AP/keywords/AoE), the
+        /// return-/overwatch-fire percentages, spread, hands-to-use, HitPoints/Armor/Weight. The clone's
+        /// own Abilities (Shoot/Strike) are kept from the elite source — they are the same ability TYPE as
+        /// base; the numeric damage they fire lives in DamagePayload, which is normalized here.
+        /// CRITICAL (headless-safe): NO customization color tag / AlwaysCustomizeColor / GameTag is added.
+        /// </summary>
+        internal static WeaponDef GetOrCreateNormalizedWeapon(DefRepository repo, WeaponDef eliteSource,
+            WeaponDef baseStats, string guidSeed, string cloneName)
+        {
+            if (repo == null || eliteSource == null || baseStats == null)
+            {
+                return null;
+            }
+            string guid = Phase4.DeriveGuid(guidSeed).ToString();
+            if (repo.GetDef(guid) is WeaponDef existing)
+            {
+                return existing;
+            }
+            WeaponDef clone = repo.CreateDef<WeaponDef>(guid, eliteSource);
+            if (clone == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] normalized weapon '{cloneName}': clone failed — skipped");
+                return null;
+            }
+            clone.name = cloneName;
+            // Numeric combat stats <- base (model/SkinData stays from the evolved source).
+            clone.DamagePayload = baseStats.DamagePayload;     // base damage/range/AP/keywords/AoE (read-only reuse)
+            clone.APToUsePerc = baseStats.APToUsePerc;
+            clone.ReturnFirePerc = baseStats.ReturnFirePerc;
+            clone.OverwatchFirePerc = baseStats.OverwatchFirePerc;
+            clone.AccurateSpreadPerc = baseStats.AccurateSpreadPerc;
+            clone.SpreadDegrees = baseStats.SpreadDegrees;
+            clone.SpreadRadius = baseStats.SpreadRadius;
+            clone.AmmoChargesPerProjectile = baseStats.AmmoChargesPerProjectile;
+            clone.HitPoints = baseStats.HitPoints;
+            clone.Armor = baseStats.Armor;
+            clone.Weight = baseStats.Weight;
+            clone.HandsToUse = baseStats.HandsToUse;
+            clone.ChargesMax = baseStats.ChargesMax;
+            return clone;
+        }
     }
 }
