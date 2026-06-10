@@ -438,6 +438,27 @@ namespace TheTurned.Core
             return true;
         }
 
+
+        /// <summary>
+        /// Remove a whole arm side (hand weapon + its bodypart) from an item list, leaving the slot EMPTY.
+        /// Used to strip the recruit's vanilla left-arm Shield so it spawns bare (Gunner/Scourge strains
+        /// have an empty left arm natively, so an empty side is a valid no-orphan state). Mirrors the
+        /// removal half of <see cref="SwapSet"/> (token match on the hand weapon + the non-weapon bodypart).
+        /// Returns true if anything was removed.
+        /// </summary>
+        internal static bool StripSide(List<GeoItem> items, string handToken, string bodyToken)
+        {
+            if (items == null)
+            {
+                return false;
+            }
+            int before = items.Count;
+            items.RemoveAll(i => i?.ItemDef?.name != null &&
+                (i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0
+              || (i.ItemDef.name.IndexOf(bodyToken, StringComparison.OrdinalIgnoreCase) >= 0 && !(i.ItemDef is WeaponDef))));
+            return items.Count != before;
+        }
+
         /// <summary>Yield every ability present in the personal track slots + the learned set. Feeds the
         /// Phase-4 marker lookups (arm SET + head SET + claw markers) and the legacy arm-marker scan.</summary>
         internal static IEnumerable<TacticalAbilityDef> EnumerateLearnedAbilities(PhoenixPoint.Common.Entities.Characters.CharacterProgression prog)

@@ -64,6 +64,13 @@ namespace TheTurned.Core
             PairSide(hands, bodyparts, "Crabman_LeftHand", "Crabman_LeftArm", LeftArmSets, isRight: false);
             PairHeads(hands, bodyparts);
             PickDefaults();
+            // V1 augment screen base-tier head cards: the native head SETs only expose the Humanoid
+            // bodypart (base + spitter SHARE Crabman_Head_Humanoid_BodyPartDef), so a bodypart-keyed card
+            // grid cannot show Spitter and an armored head as DISTINCT cards. Author two clone bodyparts
+            // (distinct GUIDs) so each becomes its own card and the apply path (EnforceSetForBodypart,
+            // keyed by bodypart GUID) resolves the correct matched hand / armor. Additive: appended AFTER
+            // PickDefaults so the recruit DEFAULT head stays the real base Humanoid.
+            BuildAuthoredHeadVariants(repo);
             bool firstAttempt = !_attempted;
             _attempted = true;
             _built = HasSets;
@@ -209,6 +216,100 @@ namespace TheTurned.Core
                 TheTurnedMain.LogWarn($"[TheTurned] CrabmanParts default(s) missing: "
                     + $"R={(DefaultRight != null)} L={(DefaultLeft != null)} H={(DefaultHead != null)}");
             }
+        }
+
+
+        // ---- V1 augment screen: base-tier card pool + authored head variants ----------------------
+
+        private static bool _authoredHeadsBuilt;
+
+        /// <summary>
+        /// The base-tier card pool for the augment screen: each slot's NON-Elite SETs (Elite/Ultra
+        /// evolution variants are deferred to the separate perk system). Right = Pincer/Gun/Viral_Gun,
+        /// Left = Shield/Grenade/Acid_Grenade, Head = Humanoid(base) + Spitter(authored) + Armored(authored).
+        /// </summary>
+        internal static IEnumerable<MatchedSet> BaseTier(IEnumerable<MatchedSet> sets) => NonElite(sets);
+
+        /// <summary>
+        /// Author two extra HEAD bodypart cards as clones of the base Humanoid head (distinct GUIDs so each
+        /// becomes its own bodypart-keyed card + apply target):
+        ///   - Spitter: clone bodypart paired with the native Crabman_Head_Spitter_WeaponDef (acid/poison
+        ///     spit). The native base + spitter sets SHARE Crabman_Head_Humanoid_BodyPartDef, which the
+        ///     bodypart-keyed card grid cannot disambiguate — the clone gives Spitter its own card.
+        ///   - Armored: clone bodypart with +Armor, no hand (a tankier base head; perks add more later).
+        /// Idempotent (deterministic MD5 GUIDs + GetDef guard). Appended to HeadSets AFTER PickDefaults so
+        /// the recruit default head stays the real base Humanoid.
+        /// </summary>
+        private static void BuildAuthoredHeadVariants(DefRepository repo)
+        {
+            if (_authoredHeadsBuilt || repo == null)
+            {
+                return;
+            }
+            // Base Humanoid head bodypart = the non-Elite, hand-null head set's bodypart (DefaultHead).
+            TacticalItemDef baseHumanoid = DefaultHead?.BodyPart
+                ?? NonElite(HeadSets).FirstOrDefault(s => s.Hand == null)?.BodyPart;
+            if (baseHumanoid == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored heads: base Humanoid head bodypart unresolved — skipped");
+                return;
+            }
+            // Native non-Elite spitter head weapon (acid/poison spit).
+            WeaponDef spitterWeapon = NonElite(HeadSets)
+                .Where(s => s.Hand != null && s.Hand.name.IndexOf("Spitter", StringComparison.OrdinalIgnoreCase) >= 0)
+                .Select(s => s.Hand)
+                .FirstOrDefault();
+
+            // -- Spitter card -----------------------------------------------------------------------
+            if (spitterWeapon != null)
+            {
+                TacticalItemDef spitterBody = CloneHeadBodypart(repo,
+                    baseHumanoid, "head:authored:Spitter", "TheTurned_Crabman_Head_Spitter_BodyPartDef", armorBonus: 0f);
+                if (spitterBody != null)
+                {
+                    HeadSets.Add(new MatchedSet { BodyPart = spitterBody, Hand = spitterWeapon, IsRight = false, Token = "Spitter" });
+                }
+            }
+            else
+            {
+                TheTurnedMain.LogWarn("[TheTurned] authored heads: native spitter head weapon unresolved — Spitter card skipped");
+            }
+
+            // -- Armored head card ------------------------------------------------------------------
+            TacticalItemDef armoredBody = CloneHeadBodypart(repo,
+                baseHumanoid, "head:authored:Armored", "TheTurned_Crabman_Head_Armored_BodyPartDef", armorBonus: ArmoredHeadArmorBonus);
+            if (armoredBody != null)
+            {
+                HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });
+            }
+
+            _authoredHeadsBuilt = true;
+        }
+
+        /// <summary>Extra armor added to the authored armored head bodypart (vanilla base head armor = 10).</summary>
+        private const float ArmoredHeadArmorBonus = 10f;
+
+        /// <summary>Idempotent clone of a head bodypart def with an optional armor bonus (ItemDef.Armor [G]).</summary>
+        private static TacticalItemDef CloneHeadBodypart(DefRepository repo, TacticalItemDef source,
+            string guidSeed, string cloneName, float armorBonus)
+        {
+            string guid = Phase4.DeriveGuid(guidSeed).ToString();
+            if (repo.GetDef(guid) is TacticalItemDef existing)
+            {
+                return existing;
+            }
+            TacticalItemDef clone = repo.CreateDef<TacticalItemDef>(guid, source);
+            if (clone == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] authored heads: clone failed for '{cloneName}'");
+                return null;
+            }
+            clone.name = cloneName;
+            if (armorBonus > 0f)
+            {
+                clone.Armor = source.Armor + armorBonus;
+            }
+            return clone;
         }
     }
 }

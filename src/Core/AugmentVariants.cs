@@ -49,9 +49,14 @@ namespace TheTurned.Core
         internal static ItemSlotDef LeftArmSlot { get; private set; }
         internal static ItemSlotDef RightArmSlot { get; private set; }
 
-        /// <summary>All variant bodypart defs (head + both arms), deduped — the card pool + the apply catalog.</summary>
+        /// <summary>BASE-TIER variant bodypart defs (head + both arms), deduped — the card pool + the apply
+        /// catalog. Elite/Ultra/evolution variants are excluded (deferred to the separate perk system); see
+        /// <see cref="CrabmanParts.BaseTier"/>. Head pool = Humanoid(base) + Spitter + Armored (the last two
+        /// are authored clone bodyparts, see CrabmanParts.BuildAuthoredHeadVariants).</summary>
         internal static IEnumerable<TacticalItemDef> AllVariantBodyparts =>
-            CrabmanParts.HeadSets.Concat(CrabmanParts.LeftArmSets).Concat(CrabmanParts.RightArmSets)
+            CrabmanParts.BaseTier(CrabmanParts.HeadSets)
+                .Concat(CrabmanParts.BaseTier(CrabmanParts.LeftArmSets))
+                .Concat(CrabmanParts.BaseTier(CrabmanParts.RightArmSets))
                 .Select(s => s.BodyPart).Where(b => b != null).Distinct();
 
         internal static bool Ready => _prepared && HeadSlot != null && LeftArmSlot != null && RightArmSlot != null;

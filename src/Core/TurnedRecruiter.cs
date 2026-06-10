@@ -87,6 +87,21 @@ namespace TheTurned.Core
                     ArmFollowHook.Subscribe(geoChar);   // matched-SET re-derive on every future level-up
                 }
 
+                // 4c. V1 base loadout: strip the vanilla LEFT-arm Shield so the recruit spawns with an
+                //     EMPTY left arm (right = base Pincer claw + head = base Humanoid come from the template
+                //     verbatim, already correct). Shield is bodypart-only (null hand) so removal leaves no
+                //     orphan; an empty left-arm slot is a valid vanilla state (Gunner/Scourge strains).
+                //     The augment screen lets the player add Shield/Grenade/Acid-Grenade afterwards.
+                if (ArthronArms.HasOptions)
+                {
+                    var loadout = new List<GeoItem>(geoChar.ArmourItems);
+                    if (ArthronArms.StripSide(loadout, ArthronArms.LeftHandToken, ArthronArms.LeftArmToken))
+                    {
+                        geoChar.SetItems(armour: loadout);
+                        Log?.LogInfo($"[TheTurned] base loadout: stripped left-arm (shield) from '{geoChar.GetName()}' — empty left arm.");
+                    }
+                }
+
                 // 5. Route into the Phoenix roster via the native grant path (GiveUnits -> AddRecruit).
                 GeoSite recruitSite = geo.PhoenixFaction.Bases?.FirstOrDefault()?.Site;
                 GeoFactionReward reward = new GeoFactionReward

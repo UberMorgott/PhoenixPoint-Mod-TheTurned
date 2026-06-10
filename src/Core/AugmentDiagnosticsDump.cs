@@ -1,8 +1,11 @@
 using Base.Defs;
+using Base.Entities.Abilities;
 using HarmonyLib;
 using PhoenixPoint.Common.Entities.Addons;
 using PhoenixPoint.Common.Entities.Items;
+using PhoenixPoint.Common.UI;
 using PhoenixPoint.Geoscape.View.ViewModules;
+using PhoenixPoint.Tactical.Entities.Abilities;
 using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
 using System;
@@ -110,6 +113,63 @@ namespace TheTurned.Core
                         TheTurnedMain.LogInfo($"    subaddon='{sb.SubAddon?.name ?? "<null>"}'");
                     }
                 }
+            }
+
+            // (e) Phase-B card-text harvest: for every BASE-TIER augment card (bodypart + matched hand),
+            //     dump the vanilla ViewElementDef loc keys + every granted AbilityDef name + ActionPointCost.
+            //     The user runs one in-game pass (open recruit -> DNA -> Bionics) and pastes this back so we
+            //     can surface the real vanilla ability descriptions (Return Fire, Deploy Shield, Spit, ...).
+            DumpCardAbilities();
+        }
+
+        /// <summary>Phase-B: dump loc keys + granted abilities (name + AP cost) per base-tier card.</summary>
+        private static void DumpCardAbilities()
+        {
+            TheTurnedMain.LogInfo("[TheTurned] DUMP PHASE-B card ability/loc harvest (base-tier cards):");
+            foreach (MatchedSet set in CrabmanParts.BaseTier(CrabmanParts.HeadSets)
+                .Concat(CrabmanParts.BaseTier(CrabmanParts.LeftArmSets))
+                .Concat(CrabmanParts.BaseTier(CrabmanParts.RightArmSets)))
+            {
+                TacticalItemDef bp = set?.BodyPart;
+                if (bp == null)
+                {
+                    continue;
+                }
+                TheTurnedMain.LogInfo($"  CARD token='{set.Token}' bodypart='{bp.name}' hand='{set.Hand?.name ?? "<none>"}' "
+                    + $"armor={bp.Armor} hp={bp.HitPoints}");
+                DumpItemTextAndAbilities("    bodypart", bp);
+                if (set.Hand != null)
+                {
+                    DumpItemTextAndAbilities("    hand", set.Hand);
+                }
+            }
+        }
+
+        private static void DumpItemTextAndAbilities(string label, ItemDef item)
+        {
+            var ved = item.ViewElementDef;
+            string nameKey = ved?.DisplayName1?.LocalizationKey ?? "<null>";
+            string descKey = ved?.Description?.LocalizationKey ?? "<null>";
+            TheTurnedMain.LogInfo($"{label} '{item.name}' nameKey='{nameKey}' descKey='{descKey}'");
+            AbilityDef[] abilities = item.Abilities;
+            if (abilities == null || abilities.Length == 0)
+            {
+                TheTurnedMain.LogInfo($"{label}   abilities: <none>");
+                return;
+            }
+            foreach (AbilityDef a in abilities)
+            {
+                if (a == null)
+                {
+                    continue;
+                }
+                TacticalAbilityDef tad = a as TacticalAbilityDef;
+                string apCost = tad != null ? tad.ActionPointCost.ToString("0.###") : "n/a";
+                ViewElementDef aved = tad?.ViewElementDef;
+                string aNameKey = aved?.DisplayName1?.LocalizationKey ?? "<null>";
+                string aDescKey = aved?.Description?.LocalizationKey ?? "<null>";
+                TheTurnedMain.LogInfo($"{label}   ability '{a.name}' type={a.GetType().Name} ap={apCost} "
+                    + $"nameKey='{aNameKey}' descKey='{aDescKey}'");
             }
         }
 
