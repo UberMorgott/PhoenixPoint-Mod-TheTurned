@@ -309,12 +309,18 @@ namespace TheTurned.Core
                 HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });
             }
 
-            // -- UMBRA head card (PROBE) — EliteHumanoid clone (armored model) + BLUE mesh tint ----
+            // -- UMBRA head card — EliteHumanoid clone (armored model), renders NORMALLY (tint BACKED OUT).
+            // The blue mesh tint via CustomizationSecondaryColorTagDef_2 is a DEAD END: the engine's addon
+            // rebuild (AddonsCharacterBuilder.RebuildCharacter -> Addon.MergeTagsWithManager) throws
+            // "InvalidOperationException: tag CustomizationSecondaryColorTagDef_0 mutually exclusive with
+            // CustomizationSecondaryColorTagDef_2", aborting RebuildCharacter -> headless recruit + blank
+            // Umbra cards [Player.log 2026-06-10]. So do NOT add the tag here; the Umbra head renders the
+            // plain armored model (like Armored). Blue will be re-applied next round via a non-tag method
+            // (per-renderer MaterialPropertyBlock / whole-actor color FX) once the shader param is confirmed.
             TacticalItemDef umbraHead = CloneHeadBodypart(repo,
                 armoredSource, "head:authored:Umbra", "TheTurned_Crabman_Head_Umbra_BodyPartDef", armorBonus: 0f);
             if (umbraHead != null)
             {
-                TintBlue(repo, umbraHead);
                 HeadSets.Add(new MatchedSet { BodyPart = umbraHead, Hand = null, IsRight = false, Token = "Umbra" });
             }
 
@@ -350,7 +356,8 @@ namespace TheTurned.Core
                 pincer.BodyPart, "arm:authored:Umbra", "TheTurned_Crabman_RightArm_Umbra_BodyPartDef", armorBonus: 0f);
             if (umbraArm != null)
             {
-                TintBlue(repo, umbraArm);
+                // Tint BACKED OUT (same mutually-exclusive-tag crash as the Umbra head) — renders the plain
+                // Pincer model for now; blue re-applied next round via a non-tag method.
                 // Hand = the Pincer weapon; the clone keeps Pincer's SubAddon so EnforceSetForBodypart skips
                 // the flat-hand add (BodypartCarriesHandSubaddon == true) and the native+SubAddon path attaches it.
                 RightArmSets.Add(new MatchedSet { BodyPart = umbraArm, Hand = pincer.Hand, IsRight = true, Token = "Umbra" });
@@ -413,7 +420,11 @@ namespace TheTurned.Core
         }
 
 
-        /// <summary>Blue-mesh-tint PROBE: enable per-item color customization on a clone and add the vanilla
+        /// <summary>DEFERRED / NOT CALLED (kept for reference). The CustomizationColorTag approach is a DEAD
+        /// END: adding CustomizationSecondaryColorTagDef_2 makes AddonsCharacterBuilder.RebuildCharacter throw
+        /// "tag _2 mutually exclusive with _0" and abort, blanking the model. Re-apply blue next round via a
+        /// non-tag method (per-renderer MaterialPropertyBlock / whole-actor color FX).
+        /// Blue-mesh-tint PROBE: enable per-item color customization on a clone and add the vanilla
         /// BLUE customization color tag, so <c>Item.RefreshTags</c> [G Item.cs:128-150] writes the palette
         /// blue into the bodypart shader via <c>HighlightControllerComponent.CustomizeColor(tag.ShaderParamName,
         /// color)</c>. `AlwaysCustomizeColor=true` satisfies the `flag2` gate. Blue tag =
