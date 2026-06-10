@@ -205,29 +205,41 @@ namespace TheTurned.Core
         }
 
         /// <summary>
-        /// Runtime counterpart of <see cref="ReshapeWithSpacer"/>: the recruit's PERSONAL
-        /// <c>AbilityTrack</c> INSTANCE is created MaxLevel (7) slots long (CharacterProgression
-        /// ctor:106), but MutoidAbilityTrackContainerElement.GetAbilitySlotForLevel indexes
-        /// slots[maxLevel] (decompile :78-97) — needs maxLevel+1. Reshapes in place and re-wires the
-        /// slot→track back-refs the AbilityTrack ctor would normally set (LearnAbility reads
-        /// slot.AbilityTrack). Idempotent; returns true when the array was actually resized.
+        /// Runtime counterpart of <see cref="ReshapeWithSpacer"/>: EVERY runtime <c>AbilityTrack</c>
+        /// INSTANCE the character carries goes through MutoidAbilityTrackContainerElement.
+        /// GetAbilitySlotForLevel, which indexes slots[maxLevel] (decompile :78-97) — needs
+        /// maxLevel+1. The Personal track is born MaxLevel (7) slots (CharacterProgression ctor:106);
+        /// the Primary/SecondaryClass tracks are CloneSlots COPIES of the def tracks SERIALIZED into
+        /// the save, so the def-level reshape (TurnedClassFactory) never reaches pre-fix clones.
+        /// Reshapes each short track in place and re-wires the slot→track back-refs the AbilityTrack
+        /// ctor would normally set (LearnAbility reads slot.AbilityTrack). Idempotent; returns true
+        /// when at least one track was actually resized.
         /// </summary>
-        internal static bool ReshapeRuntimePersonalTrack(GeoCharacter geoChar)
+        internal static bool ReshapeRuntimeTracks(GeoCharacter geoChar)
         {
-            AbilityTrack track = geoChar?.Progression?.PersonalAbilityTrack;
-            if (track?.AbilitiesByLevel == null || track.AbilitiesByLevel.Length >= RowLength + 1)
+            IReadOnlyList<AbilityTrack> tracks = geoChar?.Progression?.AbilityTracks;
+            if (tracks == null)
             {
                 return false;
             }
-            int oldLength = track.AbilitiesByLevel.Length;
-            track.AbilitiesByLevel = ReshapeWithSpacer(track.AbilitiesByLevel,
-                totalLength: RowLength + 1, spacerIndex: SpacerIndex);
-            foreach (AbilityTrackSlot slot in track.AbilitiesByLevel)
+            bool resized = false;
+            foreach (AbilityTrack track in tracks)
             {
-                slot.SetAbilityTrack(track);
+                if (track?.AbilitiesByLevel == null || track.AbilitiesByLevel.Length >= RowLength + 1)
+                {
+                    continue;
+                }
+                int oldLength = track.AbilitiesByLevel.Length;
+                track.AbilitiesByLevel = ReshapeWithSpacer(track.AbilitiesByLevel,
+                    totalLength: RowLength + 1, spacerIndex: SpacerIndex);
+                foreach (AbilityTrackSlot slot in track.AbilitiesByLevel)
+                {
+                    slot.SetAbilityTrack(track);
+                }
+                TheTurnedMain.LogInfo($"[TheTurned] {track.Source} track reshaped {oldLength}→{RowLength + 1} for '{geoChar.GetName()}'.");
+                resized = true;
             }
-            TheTurnedMain.LogInfo($"[TheTurned] Personal track reshaped {oldLength}→{RowLength + 1} for '{geoChar.GetName()}'.");
-            return true;
+            return resized;
         }
 
         /// <summary>

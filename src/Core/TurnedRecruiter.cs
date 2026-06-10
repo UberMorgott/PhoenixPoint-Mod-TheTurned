@@ -81,9 +81,9 @@ namespace TheTurned.Core
                 {
                     // C1: popup-only progression. Keep slot 0 (class proficiency = identity), blank the rest.
                     geoChar.Progression?.ClearAbilityTrack(AbilityTrackSource.Personal, keepFirstAbility: true);
-                    // Runtime Personal track is born 7 slots (MaxLevel) — the mutoid container indexes
-                    // slots[maxLevel], so reshape to maxLevel+1 like the def-level spec tracks.
-                    SpecRowFactory.ReshapeRuntimePersonalTrack(geoChar);
+                    // Runtime tracks (Personal born 7 slots, spec tracks = CloneSlots copies) — the
+                    // mutoid container indexes slots[maxLevel], so reshape each to maxLevel+1.
+                    SpecRowFactory.ReshapeRuntimeTracks(geoChar);
                     ArmFollowHook.Subscribe(geoChar);   // matched-SET re-derive on every future level-up
                 }
 

@@ -41,10 +41,11 @@ namespace TheTurned.Core
                     {
                         continue;
                     }
-                    // Save migration: pre-fix recruits carry a 7-slot runtime Personal track that
-                    // crashes the progression screen — reshape to maxLevel+1 (idempotent, not gated
-                    // on HasSets: the crash fix must apply even when arm sets failed to load).
-                    SpecRowFactory.ReshapeRuntimePersonalTrack(geoChar);
+                    // Save migration: pre-fix recruits carry 7-slot runtime tracks (Personal + the
+                    // serialized CloneSlots spec copies) that crash the progression screen — reshape
+                    // each to maxLevel+1 (idempotent, not gated on HasSets: the crash fix must apply
+                    // even when arm sets failed to load).
+                    SpecRowFactory.ReshapeRuntimeTracks(geoChar);
                     if (CrabmanParts.HasSets)
                     {
                         Subscribe(geoChar);

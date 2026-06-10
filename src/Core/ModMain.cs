@@ -90,8 +90,8 @@ namespace TheTurned
                 ArmFollowHook.ScanAndSubscribe(geo);
                 // Phase-4: feed the popup spec ROWS into the faction list (no-op when TFTV absent).
                 SpecRowFactory.FeedRows(geo);
-                // Log only when ScanAndSubscribe actually ran (same gate it no-ops on internally),
-                // so V1 log reading isn't confused when Phase 4 is disabled.
+                // Log only when the arm subscribe actually ran (same gate ScanAndSubscribe puts on
+                // its arm path), so V1 log reading isn't confused when Phase 4 is disabled.
                 if (Phase4.Enabled && CrabmanParts.HasSets)
                 {
                     Logger.LogInfo("[TheTurned] Arm-follow hook scanned/subscribed on geoscape start.");
