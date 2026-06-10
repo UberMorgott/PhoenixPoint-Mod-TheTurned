@@ -49,6 +49,11 @@ namespace TheTurned
             // Apply the shared marker-scoped CheckIsHuman Postfix. Idempotent (guarded inside Apply).
             HumanClassificationPatch.Apply((Harmony)HarmonyInstance);
 
+            // Frozen-idle fix: the CheckIsHuman flip makes UnitDisplayData assign the HUMAN anim-actions to
+            // the crab rig; this marker-scoped UnitDisplayData ctor Postfix restores the crab's native
+            // anim-actions for the recruit only. Idempotent (guarded inside Apply).
+            RecruitAnimActionsPatch.Apply((Harmony)HarmonyInstance);
+
             // V1 Phase-1 augment screen: DNA button + marker-scoped show/hide + one-shot diagnostics dump.
             // All idempotent (guarded inside each Apply). The dump is Phase4-gated and self-removes after one fire.
             AugmentButtonPatch.Apply((Harmony)HarmonyInstance);
