@@ -101,6 +101,10 @@ namespace TheTurned
             // screen; the bottom Personal row keeps the native Mutagen popup.
             CellRowPurchasePatch.Apply((Harmony)HarmonyInstance);
 
+            // CHUNK B blocker fix: make the top-row (SecondaryClass) cells BUYABLE (so the click dispatches to
+            // CellRowPurchasePatch instead of being swallowed) and show an SP (not Mutagen) hover tooltip.
+            CellRowInteractivityPatch.Apply((Harmony)HarmonyInstance);
+
             // Attach the hotkey poller to the mod's live GameObject (persists for mod lifetime).
             GameObject go = ModGO;
             if (go != null)

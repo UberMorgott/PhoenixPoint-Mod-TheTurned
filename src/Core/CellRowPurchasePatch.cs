@@ -97,6 +97,11 @@ namespace TheTurned.Core
                 {
                     return true;
                 }
+                // Entry diagnostic: confirms the click actually reaches this Prefix (CellRowInteractivityPatch
+                // must have made the cell buyable for OnPointerClick to dispatch here at all).
+                TheTurnedMain.LogInfo($"[TheTurned] CellClick: src={source} name='{slot.Ability?.name ?? "<empty>"}' "
+                    + $"locked={(button != null ? button.LockedSkill.ToString() : "<null>")} "
+                    + $"buyable={(button != null ? button.IsBuyableSkill.ToString() : "<null>")}");
                 if (button != null && button.LockedSkill)
                 {
                     return false; // locked cell — swallow (no popup), matches vanilla "do nothing when locked"
