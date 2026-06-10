@@ -15,24 +15,28 @@ namespace TheTurned.Core
     /// V1 Phase-2: repurpose the vanilla Bionics screen's three <see cref="UIModuleMutationSection"/> children
     /// to show OUR Crabman Head / Left arm / Right arm variants for the marked recruit.
     ///
-    /// The native screen has EXACTLY three sections (Human Head/Torso/Legs), keyed by
-    /// <c>section.SlotForMutation</c> [G UIModuleMutationSection.cs:68] inside
-    /// <c>UIModuleBionics.InitPossibleMutations</c> [G :328-360]. That method re-keys the sections and
-    /// re-populates each section's <c>PossibleMutations</c> from every Bionical-tagged ItemDef whose
-    /// RequiredSlotBind matches the section's slot. We PREFIX it so, for the recruit, the three sections are
-    /// retargeted to the Crabman augment slots BEFORE population runs (Option A — repurpose, do NOT inject:
-    /// the section container is non-scrollable / capped at 3). The section's <c>SlotForMutation</c> field is
-    /// shared prefab state, so we SAVE each original and RESTORE it whenever a non-recruit opens, keeping
-    /// humans untouched. We also add every variant to the faction's <c>UnlockedAugmentations</c> so none are
-    /// locked, and (Postfix) log the card count per section.
+    /// The recruit passes <c>CheckIsHuman</c> (forced by HumanClassificationPatch), so it sits in the SAME
+    /// bionics character-cycle list as humans. Arrow-cycling recruit&lt;-&gt;human mid-screen calls
+    /// <c>UIStateBionics.CharacterChangedHandler</c> [G UIStateBionics.cs:113-117] -&gt;
+    /// <c>UIModuleBionics.OnNewCharacter</c> [G UIModuleBionics.cs:136], which re-contexts the sections but
+    /// does NOT rebuild their card lists (<c>PossibleMutations</c> is only built by the private
+    /// <c>InitPossibleMutations</c> [G :328-360], called once from <c>Init</c>). So we hook
+    /// <b>OnNewCharacter</b> (fires on the initial open AND on every cycle): Prefix retargets/restores the
+    /// three sections' <c>SlotForMutation</c> for the new character and re-runs <c>InitPossibleMutations</c>
+    /// (mirroring the <c>Init</c> sequence: populate THEN OnNewCharacter), so BOTH recruit (Crabman cards)
+    /// and human (native cards) render correctly every switch. <c>SlotForMutation</c> is shared prefab state,
+    /// so each native slot is saved once and restored for humans.
+    ///
+    /// Unlocked-state is handled WITHOUT mutating the persisted <c>faction.UnlockedAugmentations</c> set —
+    /// see <see cref="BionicsUnlockBypass"/>.
     /// </summary>
     internal static class BionicsSectionPatch
     {
         internal const string PatchId = "Morgott.TheTurned.BionicsSection";
         private static bool _applied;
 
-        private static readonly FieldInfo ActorCycleField =
-            AccessTools.Field(typeof(UIModuleBionics), "_actorCycleModule");
+        private static readonly MethodInfo InitPossibleMutationsMethod =
+            AccessTools.Method(typeof(UIModuleBionics), "InitPossibleMutations");
 
         // Per-section saved native slot (so we can restore for humans). Keyed by the section instance.
         private static readonly Dictionary<UIModuleMutationSection, ItemSlotDef> _originalSlot =
@@ -46,12 +50,12 @@ namespace TheTurned.Core
             }
             try
             {
-                MethodInfo target = AccessTools.Method(typeof(UIModuleBionics), "InitPossibleMutations");
-                MethodInfo prefix = AccessTools.Method(typeof(BionicsSectionPatch), nameof(InitPossibleMutations_Prefix));
-                MethodInfo postfix = AccessTools.Method(typeof(BionicsSectionPatch), nameof(InitPossibleMutations_Postfix));
+                MethodInfo target = AccessTools.Method(typeof(UIModuleBionics), "OnNewCharacter");
+                MethodInfo prefix = AccessTools.Method(typeof(BionicsSectionPatch), nameof(OnNewCharacter_Prefix));
+                MethodInfo postfix = AccessTools.Method(typeof(BionicsSectionPatch), nameof(OnNewCharacter_Postfix));
                 harmony.Patch(target, prefix: new HarmonyMethod(prefix), postfix: new HarmonyMethod(postfix));
                 _applied = true;
-                TheTurnedMain.LogInfo("[TheTurned] BionicsSectionPatch: UIModuleBionics.InitPossibleMutations Prefix+Postfix applied.");
+                TheTurnedMain.LogInfo("[TheTurned] BionicsSectionPatch: UIModuleBionics.OnNewCharacter Prefix+Postfix applied.");
             }
             catch (Exception e)
             {
@@ -59,61 +63,37 @@ namespace TheTurned.Core
             }
         }
 
-        private static GeoCharacter CurrentCharacter(UIModuleBionics module)
-        {
-            try
-            {
-                var actorCycle = ActorCycleField?.GetValue(module) as UIModuleActorCycle;
-                return actorCycle != null ? actorCycle.CurrentCharacter : null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static void InitPossibleMutations_Prefix(UIModuleBionics __instance)
+        // Retarget/restore the sections for the INCOMING character, then rebuild the card lists, BEFORE the
+        // native OnNewCharacter body re-contexts the (now correct) sections. Mirrors Init's populate->context.
+        private static void OnNewCharacter_Prefix(UIModuleBionics __instance, GeoCharacter newCharacter)
         {
             try
             {
                 UIModuleMutationSection[] sections = __instance.GetComponentsInChildren<UIModuleMutationSection>(true);
-                bool isRecruit = Phase4.IsPhase4Recruit(CurrentCharacter(__instance));
+                bool isRecruit = Phase4.IsPhase4Recruit(newCharacter);
 
-                if (!isRecruit)
+                bool retargetChanged;
+                if (isRecruit)
                 {
-                    RestoreNativeSlots(sections);
-                    return;
+                    if (!AugmentVariants.Ready)
+                    {
+                        TheTurnedMain.LogWarn("[TheTurned] BionicsSectionPatch: recruit selected but AugmentVariants not ready — sections NOT retargeted.");
+                        return;
+                    }
+                    retargetChanged = RetargetToCrabman(sections);
                 }
-                if (!AugmentVariants.Ready)
+                else
                 {
-                    TheTurnedMain.LogWarn("[TheTurned] BionicsSectionPatch: recruit screen opened but AugmentVariants not ready — sections NOT retargeted.");
-                    return;
-                }
-
-                int retargeted = 0;
-                foreach (UIModuleMutationSection section in sections)
-                {
-                    if (section == null)
-                    {
-                        continue;
-                    }
-                    if (!_originalSlot.ContainsKey(section))
-                    {
-                        _originalSlot[section] = section.SlotForMutation; // remember the native slot, once
-                    }
-                    ItemSlotDef nativeSlot = _originalSlot[section];
-                    ItemSlotDef crab = AugmentVariants.MapHumanSlotToCrabman(nativeSlot?.SlotName);
-                    if (crab != null)
-                    {
-                        section.SlotForMutation = crab;
-                        retargeted++;
-                        TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' retargeted "
-                            + $"'{nativeSlot?.name}'({nativeSlot?.SlotName}) -> '{crab.name}'({crab.SlotName}).");
-                    }
+                    retargetChanged = RestoreNativeSlots(sections);
                 }
 
-                UnlockVariants(__instance);
-                TheTurnedMain.LogInfo($"[TheTurned] BionicsSectionPatch: {retargeted}/{sections.Length} sections retargeted for recruit.");
+                // Rebuild PossibleMutations + cards for the new character's (correct) section slots. Only when
+                // a retarget/restore actually changed a slot — otherwise the native populate from Init/prior
+                // cycle is already correct (avoids redundant container rebuilds for human->human cycles).
+                if (retargetChanged)
+                {
+                    InitPossibleMutationsMethod?.Invoke(__instance, null);
+                }
             }
             catch (Exception e)
             {
@@ -121,11 +101,11 @@ namespace TheTurned.Core
             }
         }
 
-        private static void InitPossibleMutations_Postfix(UIModuleBionics __instance)
+        private static void OnNewCharacter_Postfix(UIModuleBionics __instance, GeoCharacter newCharacter)
         {
             try
             {
-                if (!Phase4.IsPhase4Recruit(CurrentCharacter(__instance)))
+                if (!Phase4.IsPhase4Recruit(newCharacter))
                 {
                     return;
                 }
@@ -146,43 +126,52 @@ namespace TheTurned.Core
             }
         }
 
-        /// <summary>Add every Crabman variant bodypart to the faction's UnlockedAugmentations so no card is locked.</summary>
-        private static void UnlockVariants(UIModuleBionics module)
+        /// <summary>Retarget the 3 sections to the Crabman augment slots (saving each native slot once). Returns true if any changed.</summary>
+        private static bool RetargetToCrabman(UIModuleMutationSection[] sections)
         {
-            var faction = module.Context?.ViewerFaction;
-            if (faction?.UnlockedAugmentations == null)
+            bool changed = false;
+            foreach (UIModuleMutationSection section in sections)
             {
-                return;
-            }
-            int added = 0;
-            foreach (TacticalItemDef bp in AugmentVariants.AllVariantBodyparts)
-            {
-                if (faction.UnlockedAugmentations.Add(bp))
+                if (section == null)
                 {
-                    added++;
+                    continue;
+                }
+                if (!_originalSlot.ContainsKey(section))
+                {
+                    _originalSlot[section] = section.SlotForMutation; // remember the native slot, once
+                }
+                ItemSlotDef nativeSlot = _originalSlot[section];
+                ItemSlotDef crab = AugmentVariants.MapHumanSlotToCrabman(nativeSlot?.SlotName);
+                if (crab != null && section.SlotForMutation != crab)
+                {
+                    section.SlotForMutation = crab;
+                    changed = true;
+                    TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' retargeted "
+                        + $"'{nativeSlot?.name}'({nativeSlot?.SlotName}) -> '{crab.name}'({crab.SlotName}).");
                 }
             }
-            if (added > 0)
-            {
-                TheTurnedMain.LogInfo($"[TheTurned] BionicsSectionPatch: unlocked {added} Crabman variants for the faction.");
-            }
+            return changed;
         }
 
-        /// <summary>Restore any section we previously retargeted back to its native human slot (humans untouched).</summary>
-        private static void RestoreNativeSlots(UIModuleMutationSection[] sections)
+        /// <summary>Restore any section we previously retargeted back to its native human slot. Returns true if any changed.</summary>
+        private static bool RestoreNativeSlots(UIModuleMutationSection[] sections)
         {
             if (_originalSlot.Count == 0)
             {
-                return;
+                return false;
             }
+            bool changed = false;
             foreach (UIModuleMutationSection section in sections)
             {
                 if (section != null && _originalSlot.TryGetValue(section, out ItemSlotDef native) && native != null
                     && section.SlotForMutation != native)
                 {
                     section.SlotForMutation = native;
+                    changed = true;
+                    TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' restored to native '{native.name}'({native.SlotName}).");
                 }
             }
+            return changed;
         }
     }
 }

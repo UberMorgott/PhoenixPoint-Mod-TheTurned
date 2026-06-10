@@ -48,7 +48,7 @@ namespace TheTurned.Core
         }
 
         /// <summary>
-        /// Finalizer: return null to re-throw the original exception, or a non-null Exception to suppress it.
+        /// Finalizer: return null to SUPPRESS the exception, or return the Exception to RE-THROW it (Harmony).
         /// We suppress ONLY when <paramref name="__exception"/> is non-null AND the item is a Crabman def.
         /// <paramref name="__result"/> is set false so <c>AddEntryFromDef</c> treats the entry as not-added.
         /// </summary>

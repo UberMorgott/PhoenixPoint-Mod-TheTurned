@@ -55,10 +55,12 @@ namespace TheTurned
             AugmentButtonVisibilityPatch.Apply((Harmony)HarmonyInstance);
             AugmentDiagnosticsDump.Apply((Harmony)HarmonyInstance);
 
-            // V1 Phase-2 augment screen: retarget the 3 Bionics sections to Crabman Head/LeftArm/RightArm
-            // for the recruit (+ unlock variants), enforce matched bodypart+hand SETs on apply, and guard
-            // the GeoPhoenixpedia NRE when a crab item is moved to storage. All idempotent + recruit-scoped.
+            // V1 Phase-2 augment screen: retarget the 3 Bionics sections to Crabman Head/LeftArm/RightArm on
+            // every character switch (symmetric recruit<->human), scope-unlock variants WITHOUT polluting the
+            // persisted faction set, enforce matched bodypart+hand SETs on apply, and guard the
+            // GeoPhoenixpedia NRE when a crab item is moved to storage. All idempotent + recruit-scoped.
             BionicsSectionPatch.Apply((Harmony)HarmonyInstance);
+            BionicsUnlockBypass.Apply((Harmony)HarmonyInstance);
             BionicsApplyPatch.Apply((Harmony)HarmonyInstance);
             PediaNreGuard.Apply((Harmony)HarmonyInstance);
 
