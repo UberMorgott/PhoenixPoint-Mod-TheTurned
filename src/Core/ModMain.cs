@@ -28,6 +28,9 @@ namespace TheTurned
         internal static void LogInfo(string message) => Main?.Logger?.LogInfo(message);
         internal static void LogWarn(string message) => Main?.Logger?.LogWarning(message);
 
+        // One-shot diagnostic flag (see OnLevelStart).
+        private static bool _mutoidMaxLevelLogged;
+
         public override void OnModEnabled()
         {
             Main = this;
@@ -52,9 +55,9 @@ namespace TheTurned
             // Phase-4: post-mission limb auto-restore for the survival capstone (no-op when TFTV absent).
             LimbRestoreHook.Apply((Harmony)HarmonyInstance);
 
-            // Phase-4: skip rendering the Personal row on the mutoid progression screen (its element
-            // pool is 5-wide by prefab design; the popup is the progression surface for our recruits).
-            PersonalRenderSkipPatch.Apply((Harmony)HarmonyInstance);
+            // Phase-4: skip rendering the Personal + Secondary rows on the mutoid progression screen
+            // (element pools are 5-wide by prefab design; the popup is the recruits' progression surface).
+            RowRenderSkipPatch.Apply((Harmony)HarmonyInstance);
 
             // Phase-4: backfill the mutoid popup's null row/cell prefab templates (overflow = our fed rows).
             PopupPrefabPatch.Apply((Harmony)HarmonyInstance);
@@ -94,6 +97,15 @@ namespace TheTurned
             GeoLevelController geo = level != null ? level.GetComponent<GeoLevelController>() : null;
             if (geo != null)
             {
+                // Diagnostic (once): mutoid progression MaxLevel — documents the 5-wide-pool/7-level
+                // mismatch behind RowRenderSkipPatch (FactionCharacterGenerator.MutoidLevelProgression).
+                if (!_mutoidMaxLevelLogged && Phase4.Enabled)
+                {
+                    _mutoidMaxLevelLogged = true;
+                    var mutoidLp = geo.CharacterGenerator != null ? geo.CharacterGenerator.MutoidLevelProgression : null;
+                    Logger.LogInfo("[TheTurned] MutoidLevelProgression MaxLevel = "
+                        + (mutoidLp != null ? mutoidLp.MaxLevel.ToString() : "<null>"));
+                }
                 ArmFollowHook.ScanAndSubscribe(geo);
                 // Phase-4: feed the popup spec ROWS into the faction list (no-op when TFTV absent).
                 SpecRowFactory.FeedRows(geo);

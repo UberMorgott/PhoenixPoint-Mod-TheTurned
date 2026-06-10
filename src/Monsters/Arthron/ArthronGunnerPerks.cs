@@ -1,5 +1,8 @@
 using Base.Defs;
+using Base.Entities.Abilities;
+using Base.UI;
 using PhoenixPoint.Common.Entities;
+using PhoenixPoint.Common.UI;
 using PhoenixPoint.Common.Entities.Characters;
 using PhoenixPoint.Common.Entities.GameTags;
 using PhoenixPoint.Common.Entities.GameTagsTypes;
@@ -45,6 +48,10 @@ namespace TheTurned.Monsters.Arthron
         private const string ReturnFireGuid = "74b1c2d3-0001-4b74-9104-bb0102030401";
         private const string ReturnFireProgGuid = "74b1c2d3-0002-4b74-9104-bb0102030402";
         private const string ReturnFireVedGuid = "74b1c2d3-0003-4b74-9104-bb0102030403";
+        // Slot 4 Return Fire (vanilla clone + localized VED)
+        private const string ReturnFireCloneGuid = "74b1c2d3-0004-4b74-9104-bb0102030404";
+        private const string ReturnFireCloneProgGuid = "74b1c2d3-0005-4b74-9104-bb0102030405";
+        private const string ReturnFireCloneVedGuid = "74b1c2d3-0006-4b74-9104-bb0102030406";
         // Slot 5 Spotter Eyes
         private const string SpotterGuid = "75b1c2d3-0001-4b75-9105-bb0102030401";
         private const string SpotterProgGuid = "75b1c2d3-0002-4b75-9105-bb0102030402";
@@ -158,10 +165,15 @@ namespace TheTurned.Monsters.Arthron
             foreach (string name in ReturnFireCandidates)
             {
                 TacticalAbilityDef vanilla = DefUtils.ResolveByName<TacticalAbilityDef>(repo, name);
-                if (vanilla != null)
+                if (vanilla == null)
                 {
-                    TheTurnedMain.Main?.Logger?.LogInfo($"[TheTurned] Arthron gunner slot 4 using vanilla ability '{name}'.");
-                    return vanilla;
+                    continue;
+                }
+                TacticalAbilityDef clone = CloneReturnFire(repo, vanilla);
+                if (clone != null)
+                {
+                    TheTurnedMain.Main?.Logger?.LogInfo($"[TheTurned] Arthron gunner slot 4 using vanilla ability '{name}' (own clone, localized VED).");
+                    return clone;
                 }
             }
             return PerkFactory.BuildStatPassive(repo,
@@ -170,6 +182,49 @@ namespace TheTurned.Monsters.Arthron
                 "ARTHRON_RETURNFIRE_NAME", "ARTHRON_RETURNFIRE_DESC", "ArthronGunner_ReturnFire.png",
                 skillPointCost: 20, mutagenCost: 20,
                 new[] { PerkFactory.Add(StatModificationTarget.Accuracy, ReturnFire_Accuracy) });
+        }
+
+        /// <summary>
+        /// Own clone of the vanilla Return Fire def for the popup row. The vanilla def used directly
+        /// renders "NEEDS TEXT" (its VED loc keys don't resolve in the mutoid popup context) and its
+        /// CharacterProgressionData is SHARED (cost 8; PersonalTrackTags feed the human personal-track
+        /// random pool) — mutating either would leak to human soldiers. So: non-generic CreateDef keeps
+        /// the runtime type (ReturnFireAbilityDef — CreateDef&lt;T&gt; would flatten to TacticalAbilityDef
+        /// and lose the return-fire behavior, DefRepository.cs:254-283); own prog data (20/20 row scale,
+        /// empty PersonalTrackTags so the clone never enters human rolls); own VED cloned from the
+        /// VANILLA one (keeps the real icon) rebound to our CSV keys. Idempotent; null on create
+        /// failure → caller falls back to the passive.
+        /// </summary>
+        private static TacticalAbilityDef CloneReturnFire(DefRepository repo, TacticalAbilityDef vanilla)
+        {
+            TacticalAbilityDef clone = repo.GetDef(ReturnFireCloneGuid) as TacticalAbilityDef
+                ?? repo.CreateDef(ReturnFireCloneGuid, vanilla) as TacticalAbilityDef;
+            if (clone == null)
+            {
+                return null;
+            }
+            clone.name = "TheTurned_Arthron_ReturnFireClone_AbilityDef";
+            // Popup null-derefs a null prog data (cost read) — never ship the cell without one.
+            AbilityCharacterProgressionDef prog = PerkFactory.BuildProgression(repo,
+                ReturnFireCloneProgGuid, clone.name, skillPointCost: 20, mutagenCost: 20);
+            if (prog == null)
+            {
+                return null;
+            }
+            clone.CharacterProgressionData = prog;
+            TacticalAbilityViewElementDef ved = repo.GetDef(ReturnFireCloneVedGuid) as TacticalAbilityViewElementDef;
+            if (ved == null && vanilla.ViewElementDef != null)
+            {
+                ved = repo.CreateDef(ReturnFireCloneVedGuid, vanilla.ViewElementDef) as TacticalAbilityViewElementDef;
+            }
+            if (ved != null)
+            {
+                ved.name = "E_ViewElement [" + clone.name + "]";
+                ved.DisplayName1 = new LocalizedTextBind("ARTHRON_RETURNFIRE_NAME");
+                ved.Description = new LocalizedTextBind("ARTHRON_RETURNFIRE_DESC");
+                clone.ViewElementDef = ved; // icon inherited from the vanilla VED clone
+            }
+            return clone;
         }
 
         // --- Slot 5: Spotter Eyes (+Perception +Accuracy) ---------------------------------------
