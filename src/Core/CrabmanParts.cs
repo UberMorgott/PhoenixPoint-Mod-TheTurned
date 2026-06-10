@@ -331,6 +331,9 @@ namespace TheTurned.Core
                 return null;
             }
             clone.name = cloneName;
+            // SkinData (the 3D model/prefab) is intentionally NOT touched here — CreateDef copies the
+            // source's SkinData by reference, so an EliteHumanoid clone keeps EliteHumanoid's armored prefab
+            // (runtimeKey a9a243ad…, confirmed distinct from base Humanoid 122e5b8b…) and renders armored.
             if (armorBonus > 0f)
             {
                 clone.Armor = source.Armor + armorBonus;
