@@ -88,6 +88,7 @@ namespace TheTurned.Core
                     }
                     AugmentVariants.EnsureFree(); // re-assert FREE cost each open (defensive vs reload rebuilds)
                     retargetChanged = RetargetToCrabman(sections);
+                    FixRightArmPreviewSprite(sections); // right-arm row's blank empty-slot art -> torso silhouette
                 }
                 else
                 {
@@ -160,6 +161,45 @@ namespace TheTurned.Core
                 SetSectionHeader(section, AugmentVariants.HeaderKeyForSlot(crab));
             }
             return changed;
+        }
+
+
+        /// <summary>
+        /// The empty-slot preview silhouette per row = the section's own <c>PreviewSprite</c> (shown by
+        /// <c>SetPreviewMutation(null)</c> → <c>PreviewImage.sprite = PreviewSprite</c>,
+        /// [G UIModuleMutationSection.cs:415-422]). The RIGHT-arm row was retargeted from the native LEGS
+        /// section, whose PreviewSprite is blank/white; the LEFT-arm row (retargeted from the Torso/Body
+        /// section) has the torso silhouette. Copy the LEFT section's PreviewSprite onto the RIGHT section so
+        /// both arm rows show the torso silhouette. Reuses the existing sprite — no new asset. Idempotent.
+        /// </summary>
+        private static void FixRightArmPreviewSprite(UIModuleMutationSection[] sections)
+        {
+            try
+            {
+                UIModuleMutationSection left = sections.FirstOrDefault(s =>
+                    s != null && s.SlotForMutation != null && s.SlotForMutation == AugmentVariants.LeftArmSlot);
+                UIModuleMutationSection right = sections.FirstOrDefault(s =>
+                    s != null && s.SlotForMutation != null && s.SlotForMutation == AugmentVariants.RightArmSlot);
+                if (left == null || right == null || left.PreviewSprite == null)
+                {
+                    return;
+                }
+                if (right.PreviewSprite == left.PreviewSprite)
+                {
+                    return; // already done
+                }
+                right.PreviewSprite = left.PreviewSprite;
+                // If the right row is currently showing its (blank) empty-slot placeholder, refresh it live.
+                if (right.PreviewImage != null && right.MutationUsed == null)
+                {
+                    right.PreviewImage.sprite = right.PreviewSprite;
+                }
+                TheTurnedMain.LogInfo("[TheTurned] augment: right-arm row empty-slot preview set to the left-arm torso silhouette.");
+            }
+            catch (Exception e)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] FixRightArmPreviewSprite threw: " + e);
+            }
         }
 
         /// <summary>Restore any section we previously retargeted back to its native human slot. Returns true if any changed.</summary>
