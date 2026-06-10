@@ -81,8 +81,23 @@ namespace TheTurned.Monsters.Arthron
             {
                 return null;
             }
-            TacCharacterDef chosen = crabmen
-                .Where(d => !IsHighTier(d.name))
+            // TRUE BASE STARTER Arthron = the canonical base variation def, NOT "alphabetically-first
+            // non-Elite". Ordinal-first picked numbered role variants (e.g. Crabman3_AdvancedCharger —
+            // '3' < '_' in ordinal) which ship ARMORED legs + spitter heads + role loadouts → recruit
+            // spawned wrong (armored legs, spitter head). The weakest earliest Arthron the player meets
+            // is `Crabman_AlienMutationVariationDef` [recruit doc §1 / arthron-compendium §1.1]. Resolve
+            // it by exact name; fall back to the old non-high-tier heuristic only if absent (and exclude
+            // the SpawningPool lair variant, which is a structure, not a field unit).
+            TacCharacterDef chosen = crabmen.FirstOrDefault(d => d.name == "Crabman_AlienMutationVariationDef");
+            if (chosen != null)
+            {
+                return chosen;
+            }
+            TheTurnedMain.LogWarn("[TheTurned] ResolveTemplate: 'Crabman_AlienMutationVariationDef' not found — "
+                + "falling back to first non-high-tier Crabman (loadout may differ from true base).");
+            chosen = crabmen
+                .Where(d => !IsHighTier(d.name)
+                    && d.name.IndexOf("SpawningPool", StringComparison.OrdinalIgnoreCase) < 0)
                 .OrderBy(d => d.name, StringComparer.Ordinal)
                 .FirstOrDefault();
             if (chosen == null)

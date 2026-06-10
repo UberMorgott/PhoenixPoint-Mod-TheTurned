@@ -1,8 +1,10 @@
 using Base.Defs;
+using PhoenixPoint.Common.Entities.Addons;
 using PhoenixPoint.Common.Entities.Items;
 using PhoenixPoint.Geoscape.Entities;
 using PhoenixPoint.Modding;
 using PhoenixPoint.Tactical.Entities.Abilities;
+using PhoenixPoint.Tactical.Entities.Equipments;
 using PhoenixPoint.Tactical.Entities.Weapons;
 using System;
 using System.Collections.Generic;
@@ -382,33 +384,74 @@ namespace TheTurned.Core
             }
             // Locate the matched SET whose bodypart IS the applied card, and the side tokens to swap on.
             MatchedSet set = null;
-            string handToken = null, bodyToken = null;
+            string handToken = null;
             if ((set = CrabmanParts.RightArmSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
             {
-                handToken = RightHandToken; bodyToken = RightArmToken;
+                handToken = RightHandToken;
             }
             else if ((set = CrabmanParts.LeftArmSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
             {
-                handToken = LeftHandToken; bodyToken = LeftArmToken;
+                handToken = LeftHandToken;
             }
             else if ((set = CrabmanParts.HeadSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
             {
-                handToken = "Crabman_Head"; bodyToken = "Crabman_Head";
+                handToken = "Crabman_Head";
             }
             else
             {
                 return null; // not one of our variant bodyparts -> leave the native swap alone
             }
 
-            var items = new List<GeoItem>(geoChar.ArmourItems);
-            bool changed = SwapSet(items, handToken, bodyToken, set, null);
-            if (!changed)
+            // BUG-B ROOT CAUSE: the native click already placed the bodypart correctly. Native Crabman arm
+            // bodyparts carry their hand weapon as a SubAddon (verified dump:
+            // Crabman_RightArm_Gun_BodyPartDef.SubAddons = [Crabman_RightHand_Gun_WeaponDef]); SubAddons
+            // "are attached and detached together with the main addon ALWAYS" [G AddonDef.cs:74]. So the
+            // engine brings the hand from the bodypart itself. Force-adding a SECOND flat hand GeoItem
+            // conflicts with the SubAddon-attached one and the arm was being DROPPED. Therefore: only add a
+            // matched hand when the applied bodypart does NOT already declare it as a SubAddon (true for our
+            // AUTHORED head clones — clones of the Humanoid head, which has no spitter SubAddon). For native
+            // arm/shield/base-head cards this is a NO-OP and the native+SubAddon path is left untouched.
+            if (set.Hand == null || BodypartCarriesHandSubaddon(appliedBodypart, set.Hand))
             {
-                return null; // bodypart+hand already correct
+                return null;
             }
-            Log?.LogInfo($"[TheTurned] augment apply: enforced SET '{set.Token}' "
-                + $"(bodypart='{set.BodyPart?.name}' hand='{set.Hand?.name ?? "<none>"}') for '{geoChar.GetName()}'.");
+            // Authored clone (e.g. spitter head): the hand is not a SubAddon, so add it as a flat item,
+            // first removing any stale hand on this side. Do NOT touch the bodypart (native placed it).
+            var items = new List<GeoItem>(geoChar.ArmourItems);
+            int before = items.Count;
+            items.RemoveAll(i => i?.ItemDef is WeaponDef && i.ItemDef.name != null
+                && i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0);
+            bool alreadyHasHand = items.Any(i => i?.ItemDef != null && i.ItemDef.Guid == set.Hand.Guid);
+            if (!alreadyHasHand)
+            {
+                items.Add(new GeoItem(set.Hand));
+            }
+            if (items.Count == before && alreadyHasHand)
+            {
+                return null; // nothing changed
+            }
+            Log?.LogInfo($"[TheTurned] augment apply: added matched hand '{set.Hand.name}' for authored "
+                + $"bodypart '{appliedBodypart.name}' (set '{set.Token}') on '{geoChar.GetName()}'.");
             return items;
+        }
+
+        /// <summary>True if the bodypart declares <paramref name="hand"/> among its SubAddons (so the engine
+        /// auto-attaches it and we must NOT add a conflicting flat copy).</summary>
+        private static bool BodypartCarriesHandSubaddon(ItemDef bodypart, WeaponDef hand)
+        {
+            AddonDef.SubaddonBind[] subs = (bodypart as TacticalItemDef)?.SubAddons;
+            if (subs == null || hand == null)
+            {
+                return false;
+            }
+            foreach (AddonDef.SubaddonBind sb in subs)
+            {
+                if (sb.SubAddon != null && sb.SubAddon.name == hand.name)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>Replace BOTH items of a side with the desired set. desired == null -> side untouched (never strip unchosen).</summary>
@@ -438,26 +481,6 @@ namespace TheTurned.Core
             return true;
         }
 
-
-        /// <summary>
-        /// Remove a whole arm side (hand weapon + its bodypart) from an item list, leaving the slot EMPTY.
-        /// Used to strip the recruit's vanilla left-arm Shield so it spawns bare (Gunner/Scourge strains
-        /// have an empty left arm natively, so an empty side is a valid no-orphan state). Mirrors the
-        /// removal half of <see cref="SwapSet"/> (token match on the hand weapon + the non-weapon bodypart).
-        /// Returns true if anything was removed.
-        /// </summary>
-        internal static bool StripSide(List<GeoItem> items, string handToken, string bodyToken)
-        {
-            if (items == null)
-            {
-                return false;
-            }
-            int before = items.Count;
-            items.RemoveAll(i => i?.ItemDef?.name != null &&
-                (i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0
-              || (i.ItemDef.name.IndexOf(bodyToken, StringComparison.OrdinalIgnoreCase) >= 0 && !(i.ItemDef is WeaponDef))));
-            return items.Count != before;
-        }
 
         /// <summary>Yield every ability present in the personal track slots + the learned set. Feeds the
         /// Phase-4 marker lookups (arm SET + head SET + claw markers) and the legacy arm-marker scan.</summary>

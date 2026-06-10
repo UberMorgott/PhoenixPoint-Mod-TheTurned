@@ -5,6 +5,7 @@ using PhoenixPoint.Geoscape.Entities;
 using PhoenixPoint.Geoscape.View.ViewModules;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace TheTurned.Core
@@ -88,10 +89,21 @@ namespace TheTurned.Core
         private static void EnforceAndRefresh(UIModuleBionics module, ItemDef bodypart, bool patchCurrentItems)
         {
             GeoCharacter ch = module.CurrentCharacter;
+
+            // BUG-B diagnostics: dump the live armour list so a runtime pass shows exactly what the native
+            // swap left and what (if anything) we add. Cheap; one line per apply.
+            TheTurnedMain.LogInfo($"[TheTurned] augment apply DIAG: card='{bodypart.name}' "
+                + $"armour-before-enforce=[{ArmourNames(ch)}]");
+
             List<GeoItem> enforced = ArthronArms.EnforceSetForBodypart(ch, bodypart);
             if (enforced == null)
             {
-                return; // not our variant, or hand already correct
+                // Native swap + the bodypart's own SubAddons handle this card (native arm/shield/base-head).
+                // Still refresh the model so the hand weapon renders.
+                RefreshModel(module, ch);
+                TheTurnedMain.LogInfo($"[TheTurned] augment apply: '{bodypart.name}' handled by native+SubAddon path "
+                    + $"(no flat-hand add). armour=[{ArmourNames(ch)}]");
+                return;
             }
             ch.SetItems(armour: enforced);
 
@@ -103,7 +115,17 @@ namespace TheTurned.Core
             }
 
             RefreshModel(module, ch);
-            TheTurnedMain.LogInfo($"[TheTurned] augment apply: swapped to '{bodypart.name}' (+matched hand) on '{ch.GetName()}'.");
+            TheTurnedMain.LogInfo($"[TheTurned] augment apply: enforced authored hand for '{bodypart.name}' "
+                + $"on '{ch.GetName()}'. armour=[{ArmourNames(ch)}]");
+        }
+
+        private static string ArmourNames(GeoCharacter ch)
+        {
+            if (ch?.ArmourItems == null)
+            {
+                return "<null>";
+            }
+            return string.Join(", ", ch.ArmourItems.Select(i => i?.ItemDef?.name).Where(n => n != null));
         }
 
         /// <summary>Re-render the live 3D model via the screen's own actor-cycle module (private field).</summary>
@@ -112,7 +134,7 @@ namespace TheTurned.Core
             try
             {
                 var actorCycle = ActorCycleField?.GetValue(module) as UIModuleActorCycle;
-                actorCycle?.DisplaySoldier(ch, resetAnimation: false, addWeapon: false);
+                actorCycle?.DisplaySoldier(ch, resetAnimation: false, addWeapon: true);
             }
             catch (Exception e)
             {

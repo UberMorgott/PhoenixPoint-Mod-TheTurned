@@ -87,19 +87,17 @@ namespace TheTurned.Core
                     ArmFollowHook.Subscribe(geoChar);   // matched-SET re-derive on every future level-up
                 }
 
-                // 4c. V1 base loadout: strip the vanilla LEFT-arm Shield so the recruit spawns with an
-                //     EMPTY left arm (right = base Pincer claw + head = base Humanoid come from the template
-                //     verbatim, already correct). Shield is bodypart-only (null hand) so removal leaves no
-                //     orphan; an empty left-arm slot is a valid vanilla state (Gunner/Scourge strains).
-                //     The augment screen lets the player add Shield/Grenade/Acid-Grenade afterwards.
-                if (ArthronArms.HasOptions)
+                // 4c. V1 base loadout: the recruit clones the TRUE BASE Arthron def verbatim
+                //     (ArthronMonster.ResolveTemplate now resolves 'Crabman_AlienMutationVariationDef'),
+                //     so right=base Pincer claw, head=plain Humanoid (no spit), legs=unarmored, left=plain
+                //     base arm — NO stripping/mutation. (The earlier StripSide shield-strip was WRONG and
+                //     has been removed.) Log the resolved BodypartItems once so the loadout is verifiable.
+                if (Log != null)
                 {
-                    var loadout = new List<GeoItem>(geoChar.ArmourItems);
-                    if (ArthronArms.StripSide(loadout, ArthronArms.LeftHandToken, ArthronArms.LeftArmToken))
-                    {
-                        geoChar.SetItems(armour: loadout);
-                        Log?.LogInfo($"[TheTurned] base loadout: stripped left-arm (shield) from '{geoChar.GetName()}' — empty left arm.");
-                    }
+                    string parts = string.Join(", ", geoChar.ArmourItems
+                        .Select(i => i?.ItemDef?.name).Where(n => n != null));
+                    Log.LogInfo($"[TheTurned] recruit base loadout for '{geoChar.GetName()}' "
+                        + $"(template '{template.name}'): armour=[{parts}]");
                 }
 
                 // 5. Route into the Phoenix roster via the native grant path (GiveUnits -> AddRecruit).
