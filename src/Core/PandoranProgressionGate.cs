@@ -70,10 +70,11 @@ namespace TheTurned.Core
         public static bool OrGate(bool original, UIModuleCharacterProgression module)
         {
             if (original) return true;
-            // REV-2 (M-PROBE/M-LAYOUT): on the 2-row layout, DON'T OR our recruit -> _hasPandoranProgression
-            // stays false -> the HUMAN ability-track container draws (2 rows), not the mutoid popup container.
-            // (TwoRowCellLayout is a compile-time const, so the mutoid-path code below is intentionally
-            //  unreachable while it is true; it reactivates verbatim when the const is flipped to false.)
+            // REV-2 (M-PROBE/M-LAYOUT): on the 2-row layout this would NOT OR our recruit (keeping
+            // _hasPandoranProgression false -> human container). REJECTED in M-PROBE — TwoRowCellLayout is now
+            // false, so this is a no-op guard and the recruit is OR'd into the mutoid container (REV-1 path).
+            // TwoRowCellLayout is a compile-time const, so exactly one branch here const-folds to unreachable
+            // depending on its value; the pragma keeps the build warning-clean in BOTH states (revertible).
 #pragma warning disable CS0162 // Unreachable code (const-folded TwoRowCellLayout switch — intentional, revertible)
             if (Phase4.TwoRowCellLayout) return original;
             var character = (GeoCharacter)CharacterField.GetValue(module);   // assigned just before the gate line

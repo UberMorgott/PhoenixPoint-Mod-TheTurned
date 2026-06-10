@@ -19,8 +19,10 @@ namespace TheTurned.Core
         /// <summary>REV-2 2-row in-panel cell layout (top=5 SP/level Primary track, bottom=Mutagen Personal).
         /// When true, the recruit is routed to the HUMAN ability-track container (gate NOT OR'd into
         /// _hasPandoranProgression) with a 5-level LevelProgressionDef, instead of the mutoid popup container.
-        /// M-PROBE de-risks this; M-LAYOUT/M-CELLS formalize it. Flip false to revert to the REV-1 mutoid path.</summary>
-        internal const bool TwoRowCellLayout = true;
+        /// M-PROBE de-risks this; M-LAYOUT/M-CELLS formalize it. Flip false to revert to the REV-1 mutoid path.
+        /// REJECTED after M-PROBE in-game: the human container broke the clean МУТОИДЫ look (1-7 tabs, 3 rows,
+        /// lost DNA cell + mutoid skin). Staying on the mutoid container (clean 2-row purple layout) -> false.</summary>
+        internal const bool TwoRowCellLayout = false;
 
         /// <summary>True only when TFTV resolved as dependency. All Phase-4 features gate on this.</summary>
         internal static bool Enabled { get; private set; }
