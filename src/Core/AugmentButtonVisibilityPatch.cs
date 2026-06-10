@@ -59,12 +59,16 @@ namespace TheTurned.Core
 
                 if (isRecruit)
                 {
-                    // Re-hide both native augment buttons (private SetCircularButtonVisibility body inlined).
-                    SetButtonVisible(__instance.MutationButton, false);
-                    SetButtonVisible(__instance.BionicsButton, false);
+                    // Re-hide both native augment buttons. These sit in their own circular wrappers, so the
+                    // private SetCircularButtonVisibility body (parent.gameObject.SetActive) is correct here.
+                    SetNativeButtonVisible(__instance.MutationButton, false);
+                    SetNativeButtonVisible(__instance.BionicsButton, false);
                 }
                 // Show DNA only for the recruit; hide it otherwise (humans untouched beyond their own button).
-                SetButtonVisible(AugmentButtonPatch.FindDnaButton(__instance), isRecruit);
+                // The DNA clone is parented straight to the shared SoldierContextButtonsContainer (no per-button
+                // wrapper), so it MUST toggle its OWN GameObject — toggling its parent would disable every
+                // sibling button (Edit/Customize/Dismiss) for every character. See SetDnaButtonVisible.
+                SetDnaButtonVisible(AugmentButtonPatch.FindDnaButton(__instance), isRecruit);
             }
             catch (Exception e)
             {
@@ -72,10 +76,11 @@ namespace TheTurned.Core
             }
         }
 
-        // Mirror of the private EditUnitButtonsController.SetCircularButtonVisibility body (:397-401):
-        // toggle the button's PARENT GameObject active state. ResetButtonAnimations omitted (cosmetic;
-        // the native pass already ran it and we only force-hide/show).
-        private static void SetButtonVisible(PhoenixGeneralButton button, bool isVisible)
+        // NATIVE buttons only: mirror of the private EditUnitButtonsController.SetCircularButtonVisibility
+        // body (:397-401) — toggle the button's PARENT GameObject (its real circular wrapper). Safe because
+        // each native button has its own wrapper. ResetButtonAnimations omitted (cosmetic; the native pass
+        // already ran it and we only force-hide/show).
+        private static void SetNativeButtonVisible(PhoenixGeneralButton button, bool isVisible)
         {
             if (button == null)
             {
@@ -86,6 +91,18 @@ namespace TheTurned.Core
             {
                 parent.gameObject.SetActive(isVisible);
             }
+        }
+
+        // DNA CLONE only: the clone is Instantiate(EditButton, controller.transform) — added straight to the
+        // shared SoldierContextButtonsContainer with NO per-button wrapper. Toggle its OWN GameObject; toggling
+        // the parent would disable the whole container (every sibling button) for every character.
+        private static void SetDnaButtonVisible(PhoenixGeneralButton button, bool isVisible)
+        {
+            if (button == null)
+            {
+                return;
+            }
+            button.gameObject.SetActive(isVisible);
         }
     }
 }
