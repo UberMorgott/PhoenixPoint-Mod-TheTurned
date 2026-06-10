@@ -52,6 +52,12 @@ namespace TheTurned
             // Phase-4: post-mission limb auto-restore for the survival capstone (no-op when TFTV absent).
             LimbRestoreHook.Apply((Harmony)HarmonyInstance);
 
+            // Phase-4: pad the short personal skill-element pool on the mutoid progression screen.
+            PersonalPoolPatch.Apply((Harmony)HarmonyInstance);
+
+            // Phase-4: backfill the mutoid popup's null row/cell prefab templates (overflow = our fed rows).
+            PopupPrefabPatch.Apply((Harmony)HarmonyInstance);
+
             // DEV: unlock all progression levels for Phase-4 recruits (no-op unless DevUnlockAllLevels).
             DevUnlockPatch.Apply((Harmony)HarmonyInstance);
 

@@ -61,6 +61,13 @@
       <HintPath>D:\Steam\steamapps\common\Phoenix Point\PhoenixPointWin64_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <!-- StaticHorizontalLayoutGroup (popup row template) derives from HorizontalLayoutGroup, which
+         lives in UnityEngine.UI — not in Officer's ModSDK; reference it from the live game Managed
+         folder (same pattern as InputLegacyModule). -->
+    <Reference Include="UnityEngine.UI">
+      <HintPath>D:\Steam\steamapps\common\Phoenix Point\PhoenixPointWin64_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
