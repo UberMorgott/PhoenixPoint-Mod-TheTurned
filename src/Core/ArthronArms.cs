@@ -1,4 +1,5 @@
 using Base.Defs;
+using PhoenixPoint.Common.Entities.Items;
 using PhoenixPoint.Geoscape.Entities;
 using PhoenixPoint.Modding;
 using PhoenixPoint.Tactical.Entities.Abilities;
@@ -366,8 +367,52 @@ namespace TheTurned.Core
             return changed;
         }
 
+        /// <summary>
+        /// V1 Phase-2 apply path: when an augment-screen card (a Crabman arm/head BODYPART) is equipped, the
+        /// native screen places the bodypart ALONE — its matched hand weapon is NOT brought along (a single
+        /// card = one GeoItem, [G UIModuleBionics.cs:196]). Enforce the matched SET (C3) by removing that
+        /// side's stale hand+arm and adding the desired bodypart + its hand together. Returns the rebuilt
+        /// item list when a change was needed, else null (no-op). Caller commits with ONE SetItems.
+        /// </summary>
+        internal static List<GeoItem> EnforceSetForBodypart(GeoCharacter geoChar, ItemDef appliedBodypart)
+        {
+            if (geoChar == null || appliedBodypart == null || !CrabmanParts.HasSets)
+            {
+                return null;
+            }
+            // Locate the matched SET whose bodypart IS the applied card, and the side tokens to swap on.
+            MatchedSet set = null;
+            string handToken = null, bodyToken = null;
+            if ((set = CrabmanParts.RightArmSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
+            {
+                handToken = RightHandToken; bodyToken = RightArmToken;
+            }
+            else if ((set = CrabmanParts.LeftArmSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
+            {
+                handToken = LeftHandToken; bodyToken = LeftArmToken;
+            }
+            else if ((set = CrabmanParts.HeadSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
+            {
+                handToken = "Crabman_Head"; bodyToken = "Crabman_Head";
+            }
+            else
+            {
+                return null; // not one of our variant bodyparts -> leave the native swap alone
+            }
+
+            var items = new List<GeoItem>(geoChar.ArmourItems);
+            bool changed = SwapSet(items, handToken, bodyToken, set, null);
+            if (!changed)
+            {
+                return null; // bodypart+hand already correct
+            }
+            Log?.LogInfo($"[TheTurned] augment apply: enforced SET '{set.Token}' "
+                + $"(bodypart='{set.BodyPart?.name}' hand='{set.Hand?.name ?? "<none>"}') for '{geoChar.GetName()}'.");
+            return items;
+        }
+
         /// <summary>Replace BOTH items of a side with the desired set. desired == null -> side untouched (never strip unchosen).</summary>
-        private static bool SwapSet(List<GeoItem> items, string handToken, string bodyToken, MatchedSet desired, WeaponDef handOverride)
+        internal static bool SwapSet(List<GeoItem> items, string handToken, string bodyToken, MatchedSet desired, WeaponDef handOverride)
         {
             if (desired == null)
             {
