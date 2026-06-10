@@ -17,6 +17,10 @@ namespace TheTurned.Monsters.Arthron
     /// </summary>
     internal static class ArthronCellRow
     {
+        /// <summary>def-name of the cell-1 NAV marker ability — CHUNK B's click Prefix matches this to route
+        /// the click to GoToBionicsScreen instead of a purchase (CellRowPurchasePatch).</summary>
+        internal const string NavAbilityName = "TheTurned_Arthron_Cell_NAV_AbilityDef";
+
         // Spec §3: top row = SkillPoints + level-gate, NOT Mutagen. We still set mutagenCost==skillPointCost
         // through Phase4RowCells.AddMarkerCell (it passes the value to BOTH costs), because the popup reads
         // MutagenCost for display; the soldier-style SP/level gate is applied by M5 routing.
@@ -24,9 +28,9 @@ namespace TheTurned.Monsters.Arthron
         {
             var cells = new List<AbilityTrackSlot>();
 
-            // Cell 1 — NAV placeholder (free marker; M4 rebinds the click to GoToBionicsScreen).
+            // Cell 1 — NAV (free marker; CHUNK B routes the click to GoToBionicsScreen via CellRowPurchasePatch).
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:NAV",
-                "TheTurned_Arthron_Cell_NAV_AbilityDef", "ARTHRON_CELL_NAV",
+                NavAbilityName, "ARTHRON_CELL_NAV",
                 "Arthron_NaturalArmour.png", mutagenCost: 0, extraStats: null, register: null);
 
             // Cell 2 — FIRST ARMOR: Armoured legs + Carapace back-plate. Marker registers the loadout.

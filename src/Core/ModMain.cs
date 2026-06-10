@@ -96,6 +96,11 @@ namespace TheTurned
             // container/level/track shape, to de-risk the 2-row human-container layout before mass authoring.
             CellProbe.Apply((Harmony)HarmonyInstance);
 
+            // CHUNK B: per-row currency on the mutoid panel — the top row (5 evolution cells) buys with the
+            // recruit's SkillPoints IN-PANEL (bypassing the Mutagen popup), and cell 1 opens the augment/Bionics
+            // screen; the bottom Personal row keeps the native Mutagen popup.
+            CellRowPurchasePatch.Apply((Harmony)HarmonyInstance);
+
             // Attach the hotkey poller to the mod's live GameObject (persists for mod lifetime).
             GameObject go = ModGO;
             if (go != null)
