@@ -62,7 +62,6 @@ namespace TheTurned.Monsters.Arthron
         internal const float Prime_Speed = 2f;
         internal const float Prime_Willpower = 4f;
         internal const float Prime_BonusAttackDamage = 25f;
-        internal const float Prime_Armour = 10f;
 
         /// <summary>Cell-3 Alpha stat passive contents (fixed bonus, no level-scaling).</summary>
         internal static ItemStatModification[] AlphaStats() => new[]
@@ -80,7 +79,6 @@ namespace TheTurned.Monsters.Arthron
             PerkFactory.Add(StatModificationTarget.Speed, Prime_Speed),
             PerkFactory.Add(StatModificationTarget.Willpower, Prime_Willpower),
             PerkFactory.Add(StatModificationTarget.BonusAttackDamage, Prime_BonusAttackDamage),
-            PerkFactory.Add(StatModificationTarget.Armour, Prime_Armour),
         };
     }
 }

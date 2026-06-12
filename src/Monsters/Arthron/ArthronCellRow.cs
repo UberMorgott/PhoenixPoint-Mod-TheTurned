@@ -9,9 +9,9 @@ namespace TheTurned.Monsters.Arthron
     /// Phase-4 popup ROW "Cell": the 5-cell top track of the recruit's cell-progression. Cell order
     /// (2026-06-11 redefined ladder + weapon EVOLUTION):
     ///   1 NAV            — unlock the augment screen (buyable; reveals the DNA button). No payload.
-    ///   2 ARMOR1         — armor [Armoured legs + Carapace]. cost 20.
-    ///   3 LEGS_STAT      — armor [EliteAgile legs (bigger UNARMORED) + Carapace] + Alpha stat passive. cost 20.
-    ///                      Higher cell index overrides cell 2's Armoured legs (intended visual dip).
+    ///   2 ARMOR1         — armor [EliteAgile legs (light + armor) + Carapace]. cost 20.
+    ///   3 LEGS_STAT      — armor [Armoured legs (heavy, plain) + Carapace] + Alpha stat passive. cost 20.
+    ///                      Higher cell index overrides cell 2's lighter legs (heavy step in the ladder).
     ///   4 ARMOR2_EVOLVE  — armor [EliteArmoured legs + EliteCarapace + EliteTorso] + EVOLVE left weapon. cost 25.
     ///   5 PRIME_EVOLVE   — NO armor (inherits cell 4) + Prime stat passive (stacks on Alpha) + EVOLVE all
     ///                      weapons (left arm + right arm + head spit). cost 25.
@@ -44,24 +44,26 @@ namespace TheTurned.Monsters.Arthron
                 NavAbilityName, "ARTHRON_CELL_NAV",
                 "Arthron_NaturalArmour.png", mutagenCost: 20, extraStats: null, register: null);
 
-            // Cell 2 — ARMOR1: Armoured legs + Carapace back-plate. Marker registers the loadout.
+            // Cell 2 — ARMOR1: EliteAgile legs (light + armor) + Carapace back-plate. Marker registers the loadout.
+            // (Leg progression L1 light-plain -> L2 light-armored -> L3 heavy-plain -> L4 heavy-armored; leg
+            // tokens for cells 2/3 swapped vs the old order so the visual ladder matches the user-confirmed meshes.)
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:ARMOR1",
                 "TheTurned_Arthron_Cell_ARMOR1_AbilityDef", "ARTHRON_CELL_ARMOR1",
                 "Arthron_NaturalArmour.png", mutagenCost: 20, extraStats: null,
                 register: m => CellArmorMarkers.Register(m,
-                    new[] { "Crabman_Legs_Armoured_ItemDef", "Crabman_Carapace_BodyPartDef" }, order: 2));
+                    new[] { "Crabman_Legs_EliteAgile_ItemDef", "Crabman_Carapace_BodyPartDef" }, order: 2));
 
-            // Cell 3 — LEGS_STAT: bigger UNARMORED EliteAgile legs (keep the small Carapace) + Alpha stat
-            // passive. The higher cell index makes its loadout override cell 2's Armoured legs (intended
-            // visual dip). Marker is BOTH an armor marker (CellArmorMarkers) AND a stat passive (AlphaStats).
+            // Cell 3 — LEGS_STAT: heavy Armoured legs (heavy, plain — no visible armor) + small Carapace + Alpha
+            // stat passive. The higher cell index makes its loadout override cell 2's lighter legs. Marker is
+            // BOTH an armor marker (CellArmorMarkers) AND a stat passive (AlphaStats).
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:STAT_ALPHA",
                 "TheTurned_Arthron_Cell_STAT_ALPHA_AbilityDef", "ARTHRON_CELL_STAT_ALPHA",
                 "Arthron_ChitinPlating.png", mutagenCost: 20, extraStats: ArthronEvolution.AlphaStats(),
                 register: m => CellArmorMarkers.Register(m,
-                    new[] { "Crabman_Legs_EliteAgile_ItemDef", "Crabman_Carapace_BodyPartDef" }, order: 3));
+                    new[] { "Crabman_Legs_Armoured_ItemDef", "Crabman_Carapace_BodyPartDef" }, order: 3));
 
-            // Cell 4 — ARMOR2_EVOLVE: EliteArmoured legs + EliteTorso + EliteCarapace, AND evolve the player's
-            // chosen LEFT weapon (shield/launcher) to its elite variant. Prereq cell 2.
+            // Cell 4 — ARMOR2_EVOLVE: EliteArmoured legs + EliteTorso + EliteCarapace, AND evolve ALL the player's
+            // chosen weapons (left arm + right arm + head spit) to their elite variants at L4. Prereq cell 2.
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:ARMOR2",
                 "TheTurned_Arthron_Cell_ARMOR2_AbilityDef", "ARTHRON_CELL_ARMOR2",
                 "Arthron_ApexCarapace.png", mutagenCost: 25, extraStats: null,
@@ -69,7 +71,9 @@ namespace TheTurned.Monsters.Arthron
                 {
                     CellArmorMarkers.Register(m,
                         new[] { "Crabman_Legs_EliteArmoured_ItemDef", "Crabman_EliteTorso_BodyPartDef", "Crabman_EliteCarapace_BodyPartDef" }, order: 4);
-                    EvolutionMarkers.Register(m, EvolveScope.LeftWeapon);
+                    // L4 evolves ALL equipped weapons (left + right + head) to their elite variants — not just the
+                    // left. unlockLevel 4 gates the scope so nothing evolves before the recruit reaches level 4.
+                    EvolutionMarkers.Register(m, EvolveScope.AllWeapons, unlockLevel: 4);
                 });
 
             // Cell 5 — PRIME_EVOLVE: NO armor loadout (inherits cell 4's EliteArmoured/EliteCarapace) + Prime
@@ -78,7 +82,7 @@ namespace TheTurned.Monsters.Arthron
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:STAT_PRIME",
                 "TheTurned_Arthron_Cell_STAT_PRIME_AbilityDef", "ARTHRON_CELL_STAT_PRIME",
                 "Arthron_HardenedHide.png", mutagenCost: 25, extraStats: ArthronEvolution.PrimeStats(),
-                register: m => EvolutionMarkers.Register(m, EvolveScope.AllWeapons));
+                register: m => EvolutionMarkers.Register(m, EvolveScope.AllWeapons, unlockLevel: 5));
 
             return cells.ToArray();
         }

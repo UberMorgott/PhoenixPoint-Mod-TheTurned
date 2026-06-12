@@ -46,5 +46,12 @@ namespace TheTurned.Core
             w = null;
             return a != null && _clawWeapons.TryGetValue(a.Guid, out w);
         }
+
+        /// <summary>BUG2: true when the ability is one of our registered arm/head/claw cell markers.</summary>
+        internal static bool IsCellMarker(TacticalAbilityDef a)
+        {
+            return a?.Guid != null
+                && (_armSets.ContainsKey(a.Guid) || _headSets.ContainsKey(a.Guid) || _clawWeapons.ContainsKey(a.Guid));
+        }
     }
 }

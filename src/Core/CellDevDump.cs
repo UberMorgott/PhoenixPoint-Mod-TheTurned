@@ -89,6 +89,48 @@ namespace TheTurned.Core
             }
         }
 
+        // BUG1 — TEMP DEV LEG-MESH IDENTIFIER (Ctrl+Shift+L). Gated behind DevLegCycle so it is trivial to
+        // remove. All four leg defs are distinct meshes; visually they are hard to tell apart, so this cycles
+        // the FIRST recruit's equipped legs through them in a fixed order and logs the current def name. Reuses
+        // the shared CellArmorApply.BuildArmorList path (strips Crabman_Legs, re-adds the chosen leg) exactly
+        // like the Ctrl+Shift+Y armor cycle, so the equip route is identical to the real cell-armor apply.
+        internal const bool DevLegCycle = true;
+        private static int _legIndex;
+        private static readonly string[] LegDefNames =
+        {
+            "Crabman_Legs_Agile_ItemDef",        // L1 light plain
+            "Crabman_Legs_EliteAgile_ItemDef",   // L2 light + armor
+            "Crabman_Legs_Armoured_ItemDef",     // L3 heavy plain
+            "Crabman_Legs_EliteArmoured_ItemDef",// L4 heavy + armor
+        };
+
+        internal static void CycleLegsOnFirstRecruit(GeoLevelController geo)
+        {
+            if (geo?.PhoenixFaction == null || !Phase4.Enabled)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] LEGCYCLE: no geoscape/PhoenixFaction or Phase4 off.");
+                return;
+            }
+            GeoCharacter recruit = geo.PhoenixFaction.Characters?.FirstOrDefault(Phase4.IsPhase4Recruit);
+            if (recruit?.ArmourItems == null)
+            {
+                TheTurnedMain.LogWarn("[TheTurned] LEGCYCLE: no marked recruit with ArmourItems found.");
+                return;
+            }
+            string name = LegDefNames[_legIndex];
+            DefRepository repo = DefUtils.Repo;
+            var leg = DefUtils.ResolveByName<TacticalItemDef>(repo, name);
+            if (leg == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned][LEGCYCLE] '{name}' NOT RESOLVED (bundle def missing).");
+                return;
+            }
+            List<GeoItem> list = CellArmorApply.BuildArmorList(recruit, new List<TacticalItemDef> { leg });
+            recruit.SetItems(armour: list);
+            TheTurnedMain.LogInfo($"[TheTurned][LEGCYCLE] now={name}");
+            _legIndex = (_legIndex + 1) % LegDefNames.Length;
+        }
+
         private static void ApplyVariant(GeoCharacter recruit)
         {
             DefRepository repo = DefUtils.Repo;

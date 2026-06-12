@@ -169,23 +169,42 @@ namespace TheTurned.Core
             }
 
             // Non-null progression so the BetterClasses Prefix's ShouldGeneratePersonalAbilities read is safe.
-            // REV-2 (M-PROBE step 2, formalized in M-LAYOUT.1): on the 2-row layout, assign a 5-LEVEL cloned
-            // LevelProgressionDef (LevelXPTable trimmed to 5 -> MaxLevel 5, SecondSpecializationLevel disabled)
-            // so the human ability-track container renders a 5-column shape with no dual-spec level. Inline
-            // here for the probe; Level5Progression.cs formalizes it in M-LAYOUT.
+            // REV-2 (M-PROBE step 2, formalized in M-LAYOUT.1): assign a cloned LevelProgressionDef (LevelXPTable
+            // trimmed) so the mutoid ability-track container renders the intended column count. Inline here for
+            // the probe; Level5Progression.cs formalizes it in M-LAYOUT.
+            //
+            // CELL-5 ROOT-CAUSE FIX (raw-level off-by-one): the SecondaryClass runtime track is reshaped to 8
+            // slots with a spacer at idx 3 (forced: the mutoid GetAbilitySlotForLevel ALWAYS skips index
+            // generatorSecondSpec-1 = 3). The 5 real cells therefore occupy slot indices 0,1,2,4,5, so
+            // AbilityTrack.GetAbilitySlot​ -> GetAbilityLevel (RAW = index+1) yields cell1..cell5 RAW levels
+            // 1,2,3,5,6. The native availability rule (CharacterProgression.CanLearnAbility ->
+            // AbilityTrack.IsAbilitySlotAvailable: RAW level <= character level) then needs char-level >= RAW.
+            // With MaxLevel 5, cell4 (RAW 5) just fits at level 5, but cell5 (RAW 6) is NEVER satisfiable
+            // (max reachable level 5 < 6) -> cell5 is the unique cell the engine treats as permanently
+            // unlearnable -> "clicking cell 5 does nothing". cells 1-4 are unaffected (RAW 1,2,3,5 all <= 5).
+            // FIX: trim to 6 levels (MaxLevel 6) so cell5's RAW level (6) fits within MaxLevel exactly like
+            // cell4's RAW (5) does — cell5 now obeys the IDENTICAL availability rule as cells 1-4. The mutoid
+            // skip@idx3 still applies; with maxLevel 6 the render maps L1..L5 -> slots 0,1,2,4,5 = cells 1..5
+            // and L6 -> slot 6 (empty), which the RowRenderClampPatch (5-element pool) clamps off, so no
+            // phantom 6th column is shown. SecondSpecializationLevel=4 aligns the adjusted-level gate: our recruit
+            // carries the MONSTER's own ClassTag (NOT the shared MutoidClassTag), so GetAbilityAdjustedLevel takes
+            // the non-mutoid branch and reads THIS def's SecondSpecializationLevel. With =4 the adjusted shift
+            // (RAW>=4 ? RAW-1 : RAW) maps cells {1,2,3,4,5}->RAW{1,2,3,5,6}->adjusted{1,2,3,4,5}: exactly one cell
+            // per level, cell5 buyable at L5. (=0 mis-shifted ALL cells to RAW-1 -> {0,1,2,4,5} -> cells 1&2 both
+            // buyable at creation.) The spacer geometry stays driven by the GENERATOR's SecondSpecializationLevel.
             LevelProgressionDef levelProg = borrowed;
-            if (Phase4.TwoRowCellLayout && borrowed.LevelXPTable != null && borrowed.LevelXPTable.Length >= 5)
+            if (borrowed.LevelXPTable != null && borrowed.LevelXPTable.Length >= 6)
             {
-                LevelProgressionDef clone5 = DefUtils.CloneDef<LevelProgressionDef>(repo,
-                    Phase4.DeriveGuid("levelprog5:" + monster.Id).ToString(), borrowed);
-                if (clone5 != null)
+                LevelProgressionDef clone6 = DefUtils.CloneDef<LevelProgressionDef>(repo,
+                    Phase4.DeriveGuid("levelprog6:" + monster.Id).ToString(), borrowed);
+                if (clone6 != null)
                 {
-                    clone5.name = "TheTurned_" + monster.Id + "_LevelProgression5";
-                    clone5.LevelXPTable = borrowed.LevelXPTable.Take(5).ToArray();
-                    clone5.SecondSpecializationLevel = 0;
-                    levelProg = clone5;
-                    Log?.LogInfo($"[TheTurned] 2-row layout: assigned 5-level LevelProgressionDef '{clone5.name}' "
-                        + $"(MaxLevel={clone5.MaxLevel}) to '{monster.Id}'.");
+                    clone6.name = "TheTurned_" + monster.Id + "_LevelProgression6";
+                    clone6.LevelXPTable = borrowed.LevelXPTable.Take(6).ToArray();
+                    clone6.SecondSpecializationLevel = 4;
+                    levelProg = clone6;
+                    Log?.LogInfo($"[TheTurned] 2-row layout: assigned 6-level LevelProgressionDef '{clone6.name}' "
+                        + $"(MaxLevel={clone6.MaxLevel}) to '{monster.Id}' — cell5 RAW level 6 now within MaxLevel.");
                 }
             }
             clone.Data.LevelProgression = new LevelProgression(levelProg);

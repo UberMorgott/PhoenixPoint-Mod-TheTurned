@@ -26,8 +26,10 @@ The progression panel's **top evolution row** has **5 cells**. The row progresse
 | 1 | **Mutations** | Level 1 | Free | none | Navigation cell — opens the existing augment / Bionics screen. |
 | 2 | **First armor layer** | Level 2 | SkillPoints | none | First visible armor: armored legs + carapace back-plate (real Crabman bodypart defs). |
 | 3 | **Stats Basic→Alpha** | Level 3 | SkillPoints | none | Stat passive: +Endurance (→ +MaxHP), +Willpower, +Speed, + small bonus damage (tunable). |
-| 4 | **Max armor** | Level 4 | SkillPoints | cell 2 | Full visible armor: elite legs + elite torso shell + elite carapace plate. |
+| 4 | **Max armor + weapons evolve** | Level 4 | SkillPoints | cell 2 | Full visible armor: elite legs + elite torso shell + elite carapace plate. **All equipped weapons evolve to their elite form (model + stats)** — left arm, right arm, and head. |
 | 5 | **Stats Alpha→Prime** | Level 5 | SkillPoints | cell 3 | A second, cumulative stat passive on top of Alpha (tunable). |
+
+The legs progress as a visual ladder (light → light-armored → heavy → heavy-armored) and exactly one cell unlocks per character level. The head augment is **manual-only** (not auto-evolved). This evolution track is **in-game verified** (no per-frame model flicker).
 
 A **bottom Mutagen row** is designed but **deferred** (not in this build). Exact stat deltas for Alpha / Prime are tunable defaults, to be set in-game.
 
@@ -143,8 +145,10 @@ The Turned — это прежде всего **движок**. Универса
 | 1 | **Мутации** | Ур. 1 | Бесплатно | нет | Навигационная клетка — открывает существующий экран аугментаций / Bionics. |
 | 2 | **Первый слой брони** | Ур. 2 | Очки навыка | нет | Первая видимая броня: бронированные ноги + задняя пластина-карапакс (настоящие дефы частей тела Crabman). |
 | 3 | **Характеристики Basic→Alpha** | Ур. 3 | Очки навыка | нет | Пассивка характеристик: +Выносливость (→ +MaxHP), +Воля, +Скорость, + небольшой бонусный урон (настраиваемо). |
-| 4 | **Максимальная броня** | Ур. 4 | Очки навыка | клетка 2 | Полная видимая броня: элитные ноги + элитный панцирь торса + элитная пластина-карапакс. |
+| 4 | **Максимальная броня + эволюция оружия** | Ур. 4 | Очки навыка | клетка 2 | Полная видимая броня: элитные ноги + элитный панцирь торса + элитная пластина-карапакс. **Всё надетое оружие эволюционирует в элитную форму (модель + характеристики)** — левая рука, правая рука и голова. |
 | 5 | **Характеристики Alpha→Prime** | Ур. 5 | Очки навыка | клетка 3 | Вторая, кумулятивная пассивка характеристик поверх Alpha (настраиваемо). |
+
+Ноги прогрессируют как визуальная лесенка (лёгкие → легко-бронированные → тяжёлые → тяжело-бронированные), и ровно одна клетка открывается за уровень персонажа. Аугментация головы — **только вручную** (не авто-эволюция). Этот ряд эволюции **проверен в игре** (без покадрового мерцания модели).
 
 **Нижний ряд Мутагена** спроектирован, но **отложен** (нет в этой сборке). Точные дельты характеристик для Alpha / Prime — настраиваемые значения по умолчанию, задаются в игре.
 

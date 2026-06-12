@@ -2,6 +2,25 @@
 
 All notable changes to **The Turned** are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/); this project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-06-13
+
+Phase 4 bug-fix round: the 5-level monster-evolution track is now in-game verified. All fixes built 0-warn, deployed, and live-tested.
+
+### Fixed
+
+- **Legs evolution ladder order.** `ArthronCellRow` reorders the cell→leg tokens to the visual ladder light → light-armored → heavy → heavy-armored (`order2 = EliteAgile`, `order3 = Armoured`).
+- **Cell gating — exactly 1 cell per level.** `CellRowPurchasePatch` gates with `SecondSpecializationLevel = 4` + `MaxLevel = 6`, yielding exactly one cell per character level; cell 5 becomes buyable at L5.
+- **L5 cell + augment NRE.** Dropped the `Armour` stat-mod from Prime stats — an unresolvable passive `Armour` caused an "Armour not found" NRE on `UpdateStats`.
+- **Right-arm drop.** `SwapSet` now skips the flat-hand add when the bodypart already carries its hand as a `SubAddon`, so the right arm no longer drops.
+- **Pre-L4 elite guard.** `EvolutionMarkers` adds a level-guard (`charLevel >= unlockLevel`) so no elite parts appear before L4; the head is manual-only and excluded from auto-evolve.
+- **All weapons evolve at L4.** Cell-4 evolve scope widened `LeftWeapon` → `AllWeapons` (model + stats) in `ArthronArms`, so left + right + head all upgrade at L4.
+- **Head flicker / generic slot de-dup.** New per-slot dedup in `EnforceSetForBodypart` keys by the `RequiredSlotBinds` slot `Guid` → one occupant per slot across all sides, killing the per-frame `ArmorContainer` churn that caused head flicker.
+- **Viral gun** evolution resolved.
+
+### Notes
+
+- Dev-only diagnostics added this round: `CellDevDump`, and `Ctrl+Shift+L` leg-cycle (`DevLegCycle` in `RecruitHotkey`) — to be removed at cleanup.
+
 ## [0.2.0] - 2026-06-09
 
 Phase 2: framework refactor, real Arthron perks, and a stat rebalance.

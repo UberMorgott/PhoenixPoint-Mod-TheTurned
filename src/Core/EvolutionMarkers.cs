@@ -34,16 +34,24 @@ namespace TheTurned.Core
     {
         // marker ability GUID -> the evolve scope that learning it grants.
         private static readonly Dictionary<string, EvolveScope> _byMarkerGuid = new Dictionary<string, EvolveScope>();
+        // marker ability GUID -> the character level at which that cell unlocks. A learned/leaked marker only
+        // counts toward the evolve scope once the recruit's level reaches this (prevents pre-unlock evolution
+        // from a template/auto-learn leak; see HighestLearnedScope). 0 = no level gate.
+        private static readonly Dictionary<string, int> _levelByMarkerGuid = new Dictionary<string, int>();
         // normal variant token -> elite variant token (case-insensitive). Populated by the monster DATA.
         private static readonly Dictionary<string, string> _tokenMap =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>DATA hook: bind a cell marker to the evolve tier it grants (idempotent upsert).</summary>
-        internal static void Register(TacticalAbilityDef marker, EvolveScope scope)
+        /// <summary>DATA hook: bind a cell marker to the evolve tier it grants AND the character level at which
+        /// that cell unlocks (idempotent upsert). <paramref name="unlockLevel"/> gates the marker in
+        /// <see cref="HighestLearnedScope"/> so no elite weapon appears before the recruit reaches that level,
+        /// even if the marker leaks into the enumeration before being purchased (0 = no level gate).</summary>
+        internal static void Register(TacticalAbilityDef marker, EvolveScope scope, int unlockLevel = 0)
         {
             if (marker?.Guid != null && scope != EvolveScope.None)
             {
                 _byMarkerGuid[marker.Guid] = scope;
+                _levelByMarkerGuid[marker.Guid] = unlockLevel;
             }
         }
 
@@ -59,6 +67,13 @@ namespace TheTurned.Core
 
         internal static bool HasAny => _byMarkerGuid.Count > 0;
 
+        /// <summary>BUG2: true when the ability is one of our registered cell/evolution markers. Used by the
+        /// click-suppression to recognize a mod cell even if its slot's AbilityTrack.Source reads unexpectedly.</summary>
+        internal static bool IsCellMarker(TacticalAbilityDef ability)
+        {
+            return ability?.Guid != null && _byMarkerGuid.ContainsKey(ability.Guid);
+        }
+
         /// <summary>The MAXIMUM evolve scope among the recruit's learned evolve markers (None if none).
         /// Higher tier wins (L5/AllWeapons over L4/LeftWeapon).</summary>
         internal static EvolveScope HighestLearnedScope(CharacterProgression prog)
@@ -68,13 +83,23 @@ namespace TheTurned.Core
             {
                 return max;
             }
+            // LEVEL GUARD (Fix 2): a cell/evolve marker only counts toward the scope once the recruit's CURRENT
+            // level has reached that cell's unlock level. EnumerateLearnedAbilities can surface a marker (template
+            // slot or generation auto-learn of an available secondary slot) before it is actually unlocked, which
+            // would evolve weapons pre-L4. Gating here (not in EnumerateLearnedAbilities) leaves arm-set/claw
+            // selection in ApplyChosenSets untouched — those use the separate ArmOption/Phase4Markers registries.
+            int charLevel = prog.LevelProgression?.Level ?? 0;
             foreach (TacticalAbilityDef ability in ArthronArms.EnumerateLearnedAbilities(prog))
             {
                 if (ability?.Guid != null
                     && _byMarkerGuid.TryGetValue(ability.Guid, out EvolveScope s)
                     && s > max)
                 {
-                    max = s;
+                    int unlock = _levelByMarkerGuid.TryGetValue(ability.Guid, out int lvl) ? lvl : 0;
+                    if (charLevel >= unlock)
+                    {
+                        max = s;
+                    }
                 }
             }
             return max;

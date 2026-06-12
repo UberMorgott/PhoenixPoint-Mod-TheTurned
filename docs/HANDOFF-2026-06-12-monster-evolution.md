@@ -7,6 +7,25 @@
 
 ---
 
+## RESOLVED 2026-06-13 — 5-level evolution DONE + in-game verified
+
+The §2 "BUILT BUT NOT YET TESTED" 5-level evolution feature is now **deployed and in-game verified** (build 0-warn). The following bug rounds are all **DONE + in-game OK**:
+
+- **Legs order** — `ArthronCellRow` reorders cell→leg tokens to visual ladder light → light-armored → heavy → heavy-armored (`order2 = EliteAgile`, `order3 = Armoured`).
+- **Cell gating** — `CellRowPurchasePatch` `SecondSpecializationLevel = 4` + `MaxLevel = 6` → exactly 1 cell/level; cell 5 buyable @L5.
+- **L5 cell + augment NRE** — dropped `Armour` stat-mod from Prime stats; unresolvable passive `Armour` caused "Armour not found" NRE on `UpdateStats`.
+- **Right-arm drop** — `SwapSet` skips flat-hand add when the bodypart already carries its hand as a `SubAddon`.
+- **Pre-L4 elite guard** — `EvolutionMarkers` level-guard `charLevel >= unlockLevel`; head manual-only, excluded from auto-evolve.
+- **All-weapons-L4** — cell-4 evolve scope `LeftWeapon` → `AllWeapons` (model + stats) in `ArthronArms`; left + right + head evolve at L4 (supersedes §2's `LeftWeapon`-at-L4 / `AllWeapons`-at-L5 split).
+- **Head flicker / generic slot de-dup** — per-slot dedup in `ArthronArms.EnforceSetForBodypart` keyed by `RequiredSlotBinds` slot `Guid` → one occupant/slot across all sides; kills per-frame `ArmorContainer` churn (resolves the §1 residual-flicker TODO).
+- **Viral gun** — evolution resolved.
+
+Dev-only diagnostics still present (remove at cleanup): `CellDevDump`; `Ctrl+Shift+L` leg-cycle (`DevLegCycle` in `RecruitHotkey`).
+
+Remaining scope unchanged: §3 Track-2 EP-gated card availability, card→function simplification, real-stat pass (§4–§6).
+
+---
+
 ## 1. CURRENT VERIFIED STATE (done + in-game OK unless noted)
 
 - Recruit = turned Arthron as a Phoenix soldier (`Ctrl+Shift+T` dev hotkey). Hard dep **TFTV**.

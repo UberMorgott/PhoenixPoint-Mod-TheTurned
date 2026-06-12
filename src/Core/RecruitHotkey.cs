@@ -50,6 +50,19 @@ namespace TheTurned.Core
                     CellDevDump.LevelUpFirstRecruit(geo);
                 }
             }
+
+            // BUG1 — TEMP DEV LEG IDENTIFIER: Ctrl+Shift+L cycles the first recruit's equipped legs through all
+            // four leg defs (Agile -> EliteAgile -> Armoured -> EliteArmoured, wrap) and logs the current def
+            // name as "[TheTurned][LEGCYCLE] now=<def>", so the meshes can be told apart visually. Combo chosen
+            // to avoid the existing Ctrl+Shift+T/U/Y (and the AutoAI mod's Ctrl+Shift+R). Gated by DevLegCycle.
+            if (CellDevDump.DevLegCycle && Input.GetKeyDown(KeyCode.L))
+            {
+                var geo = Base.Core.GameUtl.CurrentLevel()?.GetComponent<PhoenixPoint.Geoscape.Levels.GeoLevelController>();
+                if (geo != null)
+                {
+                    CellDevDump.CycleLegsOnFirstRecruit(geo);
+                }
+            }
         }
     }
 }

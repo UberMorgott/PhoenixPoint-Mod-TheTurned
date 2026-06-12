@@ -100,7 +100,33 @@ namespace TheTurned.Core
                 // cycle is already correct (avoids redundant container rebuilds for human->human cycles).
                 if (retargetChanged)
                 {
-                    InitPossibleMutationsMethod?.Invoke(__instance, null);
+                    // BUG4a: TFTV's UIModuleBionics_InitPossibleMutations_patch.Prefix re-throws on any internal
+                    // fault (TFTVAugmentations.cs:436). Re-entering the augment screen on OUR recruit could
+                    // surface a section with a null/duplicate Crabman SlotForMutation -> TFTV's dict-key indexing
+                    // throws -> the TargetInvocationException would bubble out of this reflective Invoke into the
+                    // game's UI handler (error popup + half-applied screen). The retarget guard above makes that
+                    // path unreachable; the swallow is belt-and-braces. RECRUIT-GATED: for a NORMAL soldier
+                    // (RestoreNativeSlots also sets retargetChanged), a legitimate TFTV fault MUST surface, so we
+                    // let it bubble unwrapped instead of silently hiding a broken native augment screen.
+                    if (isRecruit)
+                    {
+                        try
+                        {
+                            InitPossibleMutationsMethod?.Invoke(__instance, null);
+                        }
+                        catch (Exception invokeEx)
+                        {
+                            Exception inner = (invokeEx as TargetInvocationException)?.InnerException ?? invokeEx;
+                            TheTurnedMain.LogWarn("[TheTurned] BionicsSectionPatch: InitPossibleMutations re-invoke "
+                                + "threw on a turned recruit (swallowed to protect the UI): " + inner);
+                        }
+                    }
+                    else
+                    {
+                        // Non-recruit: do NOT add our swallow. Invoke plainly so a legitimate TFTV fault is not
+                        // masked by this patch (it propagates exactly as it did before the Bug-4a guard existed).
+                        InitPossibleMutationsMethod?.Invoke(__instance, null);
+                    }
                 }
             }
             catch (Exception e)
@@ -138,6 +164,11 @@ namespace TheTurned.Core
         private static bool RetargetToCrabman(UIModuleMutationSection[] sections)
         {
             bool changed = false;
+            // BUG4a: track the Crabman slots already assigned this pass so two sections never collapse onto the
+            // same slot, and so we can hand an UNUSED valid slot to any section that fails to map (rather than
+            // leaving it null — TFTV's InitPossibleMutations indexes ____augmentSections[section.SlotForMutation]
+            // and throws ArgumentNullException on a null key, which propagates into the game UI handler).
+            var usedCrab = new HashSet<ItemSlotDef>();
             foreach (UIModuleMutationSection section in sections)
             {
                 if (section == null)
@@ -150,6 +181,10 @@ namespace TheTurned.Core
                 }
                 ItemSlotDef nativeSlot = _originalSlot[section];
                 ItemSlotDef crab = AugmentVariants.MapHumanSlotToCrabman(nativeSlot?.SlotName);
+                if (crab != null && usedCrab.Contains(crab))
+                {
+                    crab = null; // already taken by another section — fall through to the non-null guarantee below
+                }
                 if (crab != null && section.SlotForMutation != crab)
                 {
                     section.SlotForMutation = crab;
@@ -157,8 +192,35 @@ namespace TheTurned.Core
                     TheTurnedMain.LogInfo($"[TheTurned] augment section '{section.name}' retargeted "
                         + $"'{nativeSlot?.name}'({nativeSlot?.SlotName}) -> '{crab.name}'({crab.SlotName}).");
                 }
+                if (crab != null)
+                {
+                    usedCrab.Add(crab);
+                }
                 // Relabel the section header to our Голова / Левая рука / Правая рука (recruit only).
                 SetSectionHeader(section, AugmentVariants.HeaderKeyForSlot(crab));
+            }
+
+            // BUG4a non-null guarantee: any recruit section still carrying a NULL SlotForMutation (failed to map
+            // AND had no native slot, or all mappings were taken) is handed the first UNUSED valid Crabman slot
+            // so TFTV's dict-key indexing cannot throw. Skipping a section from GetComponentsInChildren is not
+            // possible (TFTV iterates them all), so the safe behavior is a non-null fallback, never null.
+            foreach (UIModuleMutationSection section in sections)
+            {
+                if (section == null || section.SlotForMutation != null)
+                {
+                    continue;
+                }
+                ItemSlotDef fallback = new[] { AugmentVariants.HeadSlot, AugmentVariants.LeftArmSlot, AugmentVariants.RightArmSlot }
+                    .FirstOrDefault(s => s != null && !usedCrab.Contains(s))
+                    ?? AugmentVariants.HeadSlot;
+                section.SlotForMutation = fallback;
+                if (fallback != null)
+                {
+                    usedCrab.Add(fallback);
+                }
+                changed = true;
+                TheTurnedMain.LogWarn($"[TheTurned] augment section '{section.name}' had a NULL SlotForMutation — "
+                    + $"assigned fallback '{fallback?.name}' to keep TFTV InitPossibleMutations safe.");
             }
             return changed;
         }

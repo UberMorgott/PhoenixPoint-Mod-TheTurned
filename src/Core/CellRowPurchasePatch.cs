@@ -96,7 +96,16 @@ namespace TheTurned.Core
                 }
                 // Only intercept the TOP row (the 5 cells hosted in the SecondaryClass track). Bottom purple
                 // Personal row keeps the native Mutagen-popup behavior.
-                if (slot.AbilityTrack == null || slot.AbilityTrack.Source != AbilityTrackSource.SecondaryClass)
+                // BUG2: broaden the gate — if the clicked slot's ability is one of OUR registered cell/evolution
+                // markers, intercept it (return-into-this-handler) even when slot.AbilityTrack.Source reads
+                // something other than SecondaryClass (e.g. a reshaped/spacer slot whose back-ref drifted). This
+                // guarantees the vanilla Mutagen popup never appears for a mod cell, while normal soldiers (no
+                // matching marker, non-SecondaryClass source) still fall through to vanilla below.
+                bool isOurCell = slot.Ability != null
+                    && (EvolutionMarkers.IsCellMarker(slot.Ability) || Phase4Markers.IsCellMarker(slot.Ability));
+                bool isSecondaryTopRow = slot.AbilityTrack != null
+                    && slot.AbilityTrack.Source == AbilityTrackSource.SecondaryClass;
+                if (!isSecondaryTopRow && !isOurCell)
                 {
                     return true;
                 }
@@ -188,7 +197,20 @@ namespace TheTurned.Core
             }
             catch (Exception e)
             {
-                TheTurnedMain.LogWarn("[TheTurned] CellRowPurchasePatch prefix threw (falling back to vanilla): " + e);
+                // BUG2 FIX: for a CONFIRMED Phase-4 recruit, swallow the vanilla Mutagen popup on ANY exception
+                // (return false) instead of falling through to it (return true). The stray popup was worse than a
+                // no-op. Non-recruit characters keep vanilla behavior (return true) so normal soldiers are
+                // unaffected. We re-resolve the recruit flag defensively (the throw may have happened before/after
+                // the in-try check; FindObjectOfType/reflection can fault).
+                GeoCharacter faulted = null;
+                try { faulted = ContainerCharacterField.GetValue(__instance) as GeoCharacter; } catch { /* ignore */ }
+                if (Phase4.IsPhase4Recruit(faulted))
+                {
+                    TheTurnedMain.LogWarn("[TheTurned] CellRowPurchasePatch prefix threw for a turned recruit "
+                        + "(suppressing vanilla popup): " + e);
+                    return false;
+                }
+                TheTurnedMain.LogWarn("[TheTurned] CellRowPurchasePatch prefix threw (non-recruit, falling back to vanilla): " + e);
                 return true;
             }
         }

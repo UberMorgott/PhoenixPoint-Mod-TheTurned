@@ -279,6 +279,15 @@ namespace TheTurned.Core
                                    (clawOverride != null && wantRight == CrabmanParts.DefaultRight) ? clawOverride : null);
                 changed |= SwapSet(newList, LeftHandToken, LeftArmToken, wantLeft, null);
                 changed |= SwapSet(newList, "Crabman_Head", "Crabman_Head", wantHead, null);
+
+                // BUG3: EVOLVE EQUIPPED GEAR. Gear equipped through the augment/Bionics DNA screen lands in
+                // geoChar.ArmourItems WITHOUT learning any marker ability, so the marker-derived wants above
+                // never see it -> it would stay base at L4/L5. Walk the equipped Crabman arm/hand/head items and,
+                // for each within the current evolve scope, upgrade its base token to the registered elite
+                // MatchedSet (same token map + side lists EvolveSet uses). Idempotent: already-elite tokens have
+                // no upgrade (TryGetEliteToken=false) and SwapSet skips when the elite is already present.
+                changed |= EvolveEquippedGear(newList, scope, clawOverride);
+
                 if (changed)
                 {
                     geoChar.SetItems(armour: newList);
@@ -311,6 +320,112 @@ namespace TheTurned.Core
             }
             Log?.LogInfo($"[TheTurned] evolve: '{chosen.Token}' -> '{elite.Token}'.");
             return elite;
+        }
+
+        /// <summary>BUG3: evolve gear that is EQUIPPED (in <paramref name="items"/>) but learned no marker, so the
+        /// marker-derived <see cref="ApplyChosenSets"/> wants never covered it. For each equipped Crabman
+        /// arm/hand/head item whose side is within <paramref name="scope"/>, map its base variant token to the
+        /// registered elite MatchedSet and swap the bodypart+hand. Idempotent (already-elite tokens have no
+        /// upgrade; SwapSet skips when the elite is already present). Returns true if anything changed.
+        /// Scope: L4/LeftWeapon -> left only; L5/AllWeapons -> left + right + head.</summary>
+        private static bool EvolveEquippedGear(List<GeoItem> items, EvolveScope scope, WeaponDef clawOverride)
+        {
+            if (scope == EvolveScope.None || items == null)
+            {
+                return false;
+            }
+            bool changed = false;
+            // Snapshot the equipped tokens per side FIRST (the loop below mutates `items` via SwapSet, so we
+            // must not iterate it live). Prefer the BODYPART token; fall back to the hand token.
+            string leftToken = ExtractSideToken(items, LeftArmToken, LeftHandToken);
+            string rightToken = ExtractSideToken(items, RightArmToken, RightHandToken);
+
+            if (scope >= EvolveScope.LeftWeapon)
+            {
+                changed |= EvolveEquippedSide(items, leftToken, CrabmanParts.LeftArmSets, LeftHandToken, LeftArmToken);
+            }
+            if (scope >= EvolveScope.AllWeapons)
+            {
+                // Mirror the marker-derived right-arm guard in ApplyChosenSets: when a claw clone owns the right
+                // hand (the clone IS the player's chosen weapon, and clones keep the Crabman_RightHand token),
+                // SKIP the right side — evolving would SwapSet the elite set's default hand over the player's
+                // claw, clobbering their choice. The HEAD is NEVER auto-evolved here: it is chosen manually in
+                // the DNA/augment screen and auto-evolve must never clobber it (was causing manual-pick revert
+                // + per-frame head flicker). Only the right + left arm/shield/launcher sides evolve.
+                if (clawOverride == null)
+                {
+                    changed |= EvolveEquippedSide(items, rightToken, CrabmanParts.RightArmSets, RightHandToken, RightArmToken);
+                }
+            }
+            return changed;
+        }
+
+        /// <summary>BUG3: find the variant token of the equipped item on one side. Scans <paramref name="items"/>
+        /// for a def whose name embeds <paramref name="bodyPrefix"/> (preferred) or <paramref name="handPrefix"/>,
+        /// strips any leading "TheTurned_" clone prefix by matching from the embedded "Crabman_*" substring, and
+        /// returns the variant token via <see cref="CrabmanParts.VariantToken"/>. Null when nothing equipped.</summary>
+        private static string ExtractSideToken(List<GeoItem> items, string bodyPrefix, string handPrefix)
+        {
+            string body = TokenFromItems(items, bodyPrefix, requireNonWeapon: !string.Equals(bodyPrefix, handPrefix));
+            if (!string.IsNullOrEmpty(body))
+            {
+                return body;
+            }
+            return TokenFromItems(items, handPrefix, requireNonWeapon: false);
+        }
+
+        private static string TokenFromItems(List<GeoItem> items, string prefix, bool requireNonWeapon)
+        {
+            foreach (GeoItem item in items)
+            {
+                string name = item?.ItemDef?.name;
+                if (name == null)
+                {
+                    continue;
+                }
+                if (requireNonWeapon && item.ItemDef is WeaponDef)
+                {
+                    continue;
+                }
+                int idx = name.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+                if (idx < 0)
+                {
+                    continue;
+                }
+                // Slice from the embedded "Crabman_*" prefix so VariantToken's Substring(prefix.Length) is valid
+                // even when the def carries a leading "TheTurned_" (authored clone) prefix.
+                string token = CrabmanParts.VariantToken(name.Substring(idx), prefix);
+                if (!string.IsNullOrEmpty(token))
+                {
+                    return token;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>BUG3: if <paramref name="baseToken"/> has a registered elite upgrade present in
+        /// <paramref name="sideSets"/>, swap that elite MatchedSet (bodypart+hand) into <paramref name="items"/>.</summary>
+        private static bool EvolveEquippedSide(List<GeoItem> items, string baseToken,
+            IEnumerable<MatchedSet> sideSets, string handToken, string bodyToken)
+        {
+            if (string.IsNullOrEmpty(baseToken)
+                || !EvolutionMarkers.TryGetEliteToken(baseToken, out string eliteToken))
+            {
+                return false;
+            }
+            MatchedSet elite = sideSets?.FirstOrDefault(s => CrabmanParts.TokenExact(s.Token, eliteToken));
+            if (elite == null)
+            {
+                Log?.LogWarning($"[TheTurned] evolve-equipped: elite set '{eliteToken}' for equipped "
+                    + $"'{baseToken}' not found in enumeration — left unevolved.");
+                return false;
+            }
+            if (SwapSet(items, handToken, bodyToken, elite, null))
+            {
+                Log?.LogInfo($"[TheTurned] evolve-equipped: '{baseToken}' -> '{elite.Token}'.");
+                return true;
+            }
+            return false;
         }
 
 
@@ -538,24 +653,120 @@ namespace TheTurned.Core
             {
                 return null;
             }
+
+            // === GENERIC PER-SLOT DEDUP (root-cause fix for the per-frame ArmorContainer churn loop) ===
+            // The native augment swap evicts a prior occupant ONLY when the engine recognises it as the same
+            // slot. It fails to do so in two authored cases: (a) a head occupant is a WeaponDef placed into the
+            // head bodypart slot (Spitter <-> Evolved_Spitter), and (b) an arm slot ends up with two bodyparts
+            // (e.g. left-arm Shield AND the acid-grenade "bazooka") after toggling variants in the DNA screen.
+            // With two occupants of ONE slot, the native ArmorContainer (UIInventoryList.GetFirstAvailableSlot)
+            // cannot place both and destroys+recreates one every frame forever (~60fps churn).
+            //
+            // Robust GENERAL fix, for ANY side/slot (head, left arm, right arm, torso, legs, carapace): key
+            // occupants by the APPLIED item's OWN RequiredSlotBinds slot Guids and remove every OTHER occupant
+            // whose slot Guids intersect -> at most ONE occupant per slot remains (the just-applied one).
+            // SAFETY: a bodypart's HAND weapon is a SubAddon occupying a DIFFERENT RequiredSlot (different Guid)
+            // than the arm [G UIModuleBionics.cs:421 resolves them as separate slot binds], so its slot Guids do
+            // NOT intersect the arm's -> the hand is NEVER evicted. Items with no RequiredSlotBinds are never
+            // matched (and an applied item with no slot binds skips dedup entirely) -> nothing is stripped
+            // unsafely. For a normal swap (already exactly one occupant) this is a NO-OP -> native left alone.
+            List<GeoItem> working = null;
+            var appliedSlotGuids = new HashSet<string>(SlotGuids(appliedBodypart));
+            if (appliedSlotGuids.Count > 0)
+            {
+                var deduped = new List<GeoItem>(geoChar.ArmourItems);
+                int removed = deduped.RemoveAll(i => i?.ItemDef != null
+                    && i.ItemDef.Guid != appliedBodypart.Guid
+                    && SlotGuids(i.ItemDef).Any(g => appliedSlotGuids.Contains(g)));
+                // Guard: ensure the just-applied bodypart is present (native click placed it; re-add if a
+                // refresh dropped it) so the manual pick always persists after dedup.
+                bool readded = false;
+                if (!deduped.Any(i => i?.ItemDef != null && i.ItemDef.Guid == appliedBodypart.Guid))
+                {
+                    deduped.Add(new GeoItem(appliedBodypart));
+                    readded = true;
+                }
+                // Airtight collapse: if the SAME applied def somehow occupies the slot more than once (two
+                // GeoItems of the same Guid), keep exactly ONE — otherwise the native ArmorContainer still sees
+                // two occupants of one slot and the per-frame churn persists. Keep the first, drop the rest.
+                bool seenApplied = false;
+                removed += deduped.RemoveAll(i =>
+                {
+                    if (i?.ItemDef == null || i.ItemDef.Guid != appliedBodypart.Guid)
+                    {
+                        return false;
+                    }
+                    if (seenApplied)
+                    {
+                        return true; // a duplicate copy of the applied def -> drop
+                    }
+                    seenApplied = true;
+                    return false; // keep the first applied occupant
+                });
+                if (removed > 0 || readded)
+                {
+                    Log?.LogInfo($"[TheTurned] augment apply (slot dedup): kept '{appliedBodypart.name}', removed "
+                        + $"{removed} stale occupant(s) in slot(s) [{string.Join(", ", appliedSlotGuids)}] "
+                        + $"for '{geoChar.GetName()}'.");
+                    working = deduped;
+                }
+            }
+
             // Locate the matched SET whose bodypart IS the applied card, and the side tokens to swap on.
             MatchedSet set = null;
             string handToken = null;
+            string bodyToken = null;
+            IEnumerable<MatchedSet> sideSets = null;
+            EvolveScope sideScope = EvolveScope.None; // scope at/above which THIS side evolves to elite
             if ((set = CrabmanParts.RightArmSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
             {
-                handToken = RightHandToken;
+                handToken = RightHandToken; bodyToken = RightArmToken;
+                sideSets = CrabmanParts.RightArmSets; sideScope = EvolveScope.AllWeapons; // right evolves at L5
             }
             else if ((set = CrabmanParts.LeftArmSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
             {
-                handToken = LeftHandToken;
+                handToken = LeftHandToken; bodyToken = LeftArmToken;
+                sideSets = CrabmanParts.LeftArmSets; sideScope = EvolveScope.LeftWeapon; // left evolves at L4
             }
             else if ((set = CrabmanParts.HeadSets.FirstOrDefault(s => s.BodyPart != null && s.BodyPart.Guid == appliedBodypart.Guid)) != null)
             {
-                handToken = "Crabman_Head";
+                handToken = "Crabman_Head"; bodyToken = "Crabman_Head";
+                sideSets = CrabmanParts.HeadSets; sideScope = EvolveScope.AllWeapons; // head evolves at L5
             }
             else
             {
-                return null; // not one of our variant bodyparts -> leave the native swap alone
+                // Not one of our variant bodyparts (torso/legs/carapace/etc.): the generic slot-dedup above is
+                // the only enforcement -> return its result (deduped list if it removed a stale same-slot
+                // occupant, else null to leave the native swap alone).
+                return working;
+            }
+
+            // The HEAD is picked MANUALLY in the DNA/augment screen and must be applied VERBATIM — auto-evolve
+            // must NEVER touch it (was reverting the manual pick). The generic slot-dedup above already left a
+            // single head occupant (head WeaponDef clones carry Crabman_Head_SlotDef RequiredSlotBinds), so the
+            // head needs nothing further here; the sideSets!=HeadSets guard below skips evolve for it.
+
+            // BUG4b: PERK-AWARE apply. Re-derive base-vs-elite from the LEARNED CELLS first (same scope logic
+            // ApplyChosenSets uses), THEN apply — instead of mutating off whatever stale base part the native
+            // click placed. If the learned evolve scope covers THIS side, swap the placed BASE set for its elite
+            // variant (full bodypart+hand swap via the shared SwapSet). Makes re-entry idempotent + perk-correct
+            // (EvolveSet returns the set unchanged when already elite / no upgrade -> no-op for non-evolvable
+            // cards). Dovetails with BUG3's evolve-equipped pass (shared EvolveSet + SwapSet helpers). Runs on
+            // the deduped working list when dedup fired, so evolve composes with the per-slot cleanup.
+            EvolveScope learnedScope = EvolutionMarkers.HighestLearnedScope(geoChar.Progression);
+            if (sideSets != CrabmanParts.HeadSets && learnedScope >= sideScope)
+            {
+                MatchedSet evolved = EvolveSet(set, sideSets);
+                if (evolved != null && evolved != set)
+                {
+                    var evolveItems = working ?? new List<GeoItem>(geoChar.ArmourItems);
+                    if (SwapSet(evolveItems, handToken, bodyToken, evolved, null))
+                    {
+                        Log?.LogInfo($"[TheTurned] augment apply (perk-aware): evolved applied '{set.Token}' "
+                            + $"-> '{evolved.Token}' for '{geoChar.GetName()}' (learned scope {learnedScope}).");
+                        return evolveItems;
+                    }
+                }
             }
 
             // BUG-B ROOT CAUSE: the native click already placed the bodypart correctly. Native Crabman arm
@@ -569,11 +780,11 @@ namespace TheTurned.Core
             // arm/shield/base-head cards this is a NO-OP and the native+SubAddon path is left untouched.
             if (set.Hand == null || BodypartCarriesHandSubaddon(appliedBodypart, set.Hand))
             {
-                return null;
+                return working; // no flat hand to add -> return the deduped list (or null) untouched
             }
             // Authored clone (e.g. spitter head): the hand is not a SubAddon, so add it as a flat item,
             // first removing any stale hand on this side. Do NOT touch the bodypart (native placed it).
-            var items = new List<GeoItem>(geoChar.ArmourItems);
+            var items = working ?? new List<GeoItem>(geoChar.ArmourItems);
             int before = items.Count;
             items.RemoveAll(i => i?.ItemDef is WeaponDef && i.ItemDef.name != null
                 && i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0);
@@ -584,11 +795,24 @@ namespace TheTurned.Core
             }
             if (items.Count == before && alreadyHasHand)
             {
-                return null; // nothing changed
+                return working; // nothing changed by the hand path -> return the deduped list (or null)
             }
             Log?.LogInfo($"[TheTurned] augment apply: added matched hand '{set.Hand.name}' for authored "
                 + $"bodypart '{appliedBodypart.name}' (set '{set.Token}') on '{geoChar.GetName()}'.");
             return items;
+        }
+
+        /// <summary>
+        /// Slot keys for an item: the <c>Guid</c> of each <see cref="AddonSlotDef"/> the item's OWN
+        /// <see cref="AddonDef.RequiredSlotBinds"/> target. Two items are "same slot" iff these sets intersect.
+        /// Deliberately does NOT fold in SubAddon slot binds — a bodypart's hand SubAddon lives in a DIFFERENT
+        /// RequiredSlot, so keying on the item's own binds guarantees per-slot dedup never evicts the hand.
+        /// </summary>
+        private static IEnumerable<string> SlotGuids(ItemDef def)
+        {
+            return (def?.RequiredSlotBinds ?? Array.Empty<AddonDef.RequiredSlotBind>())
+                .Where(b => b.RequiredSlot != null)
+                .Select(b => b.RequiredSlot.Guid);
         }
 
         /// <summary>True if the bodypart declares <paramref name="hand"/> among its SubAddons (so the engine
@@ -630,7 +854,11 @@ namespace TheTurned.Core
                 (i.ItemDef.name.IndexOf(handToken, StringComparison.OrdinalIgnoreCase) >= 0
               || (i.ItemDef.name.IndexOf(bodyToken, StringComparison.OrdinalIgnoreCase) >= 0 && !(i.ItemDef is WeaponDef))));
             items.Add(new GeoItem(desired.BodyPart));
-            if (hand != null)
+            // BUG-B GUARD (mirrors EnforceSetForBodypart): native Crabman elite/base arm bodyparts carry their
+            // hand weapon as an auto-attached SubAddon. Adding a SECOND flat GeoItem(hand) conflicts with the
+            // SubAddon-attached one and the engine DROPS the whole arm. Only add the flat hand when the bodypart
+            // does NOT already declare it as a SubAddon (true for authored clones whose hand is not a SubAddon).
+            if (hand != null && !BodypartCarriesHandSubaddon(desired.BodyPart, hand))
             {
                 items.Add(new GeoItem(hand));
             }
