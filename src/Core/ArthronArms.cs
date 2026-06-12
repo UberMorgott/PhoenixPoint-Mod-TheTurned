@@ -252,6 +252,27 @@ namespace TheTurned.Core
                     wantRight = CrabmanParts.DefaultRight;
                 }
 
+                // WEAPON EVOLUTION (generic): upgrade the player's CHOSEN set to its elite variant when an
+                // evolve cell is learned. Scope is the MAXIMUM learned tier (L5 AllWeapons implies L4
+                // LeftWeapon). Composed HERE in the same derive that owns the arms, so it survives the
+                // per-frame refresh + the cell-armor prefix and stays idempotent (re-derived each pass).
+                // Honour player choice: evolve ONLY the chosen set; null/already-elite/no-mapping -> unchanged.
+                // The token map + scope-per-cell are monster DATA (EvolutionMarkers, filled by ArthronEvolution).
+                EvolveScope scope = EvolutionMarkers.HighestLearnedScope(geoChar.Progression);
+                if (scope >= EvolveScope.LeftWeapon)
+                {
+                    wantLeft = EvolveSet(wantLeft, CrabmanParts.LeftArmSets);
+                }
+                if (scope >= EvolveScope.AllWeapons)
+                {
+                    // Right arm: skip when a claw clone owns the right hand (the clone IS the chosen weapon).
+                    if (clawOverride == null)
+                    {
+                        wantRight = EvolveSet(wantRight, CrabmanParts.RightArmSets);
+                    }
+                    wantHead = EvolveSet(wantHead, CrabmanParts.HeadSets);
+                }
+
                 var newList = new List<GeoItem>(geoChar.ArmourItems);
                 bool changed = false;
                 changed |= SwapSet(newList, RightHandToken, RightArmToken, wantRight,
@@ -269,6 +290,27 @@ namespace TheTurned.Core
             {
                 Log?.LogWarning("[TheTurned] ApplyChosenSets failed: " + e);
             }
+        }
+
+        /// <summary>GENERIC evolve step: replace <paramref name="chosen"/> with the elite-variant MatchedSet
+        /// from the SAME side list when an upgrade is registered (EvolutionMarkers DATA). Returns the chosen
+        /// set unchanged when it is null, already elite, has no registered upgrade, or the elite MatchedSet is
+        /// absent from the enumeration. Idempotent + honours player choice (only the chosen set is touched).</summary>
+        private static MatchedSet EvolveSet(MatchedSet chosen, IEnumerable<MatchedSet> sideSets)
+        {
+            if (chosen == null || !EvolutionMarkers.TryGetEliteToken(chosen.Token, out string eliteToken))
+            {
+                return chosen;
+            }
+            MatchedSet elite = sideSets?.FirstOrDefault(s => CrabmanParts.TokenExact(s.Token, eliteToken));
+            if (elite == null)
+            {
+                Log?.LogWarning($"[TheTurned] evolve: elite set '{eliteToken}' for chosen '{chosen.Token}' "
+                    + "not found in enumeration — left unevolved.");
+                return chosen;
+            }
+            Log?.LogInfo($"[TheTurned] evolve: '{chosen.Token}' -> '{elite.Token}'.");
+            return elite;
         }
 
 

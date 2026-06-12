@@ -283,14 +283,17 @@ namespace TheTurned.Core
                 .FirstOrDefault();
             WeaponDef eliteSpitterWeapon = DefUtils.ResolveByName<WeaponDef>(repo, "Crabman_Head_EliteSpitter_WeaponDef");
 
-            // -- SPITTER card (clone base Humanoid + ordinary spitter weapon) -----------------------
+            // -- SPITTER card (clone the ordinary spit WEAPON as the head-slot occupant) --------------
+            // The spit organ mesh = the weapon's SkinData (rides on the weapon, not on a bodypart). Occupying
+            // the head slot with this weapon clone renders skull(from chassis) + visible spit organ. Hand=null:
+            // a single head occupant, no second flat-hand SetItems (EnforceSetForBodypart returns null).
             if (spitterWeapon != null)
             {
-                TacticalItemDef spitterBody = CloneHeadBodypart(repo,
-                    baseHumanoid, baseHumanoid, "head:authored:Spitter", "TheTurned_Crabman_Head_Spitter_BodyPartDef");
-                if (spitterBody != null)
+                TacticalItemDef spitterHead = CloneHeadWeapon(repo,
+                    spitterWeapon, spitterWeapon, "head:authored:Spitter", "TheTurned_Crabman_Head_Spitter_WeaponDef");
+                if (spitterHead != null)
                 {
-                    HeadSets.Add(new MatchedSet { BodyPart = spitterBody, Hand = spitterWeapon, IsRight = false, Token = "Spitter" });
+                    HeadSets.Add(new MatchedSet { BodyPart = spitterHead, Hand = null, IsRight = false, Token = "Spitter" });
                 }
             }
             else
@@ -312,18 +315,19 @@ namespace TheTurned.Core
                 HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });
             }
 
-            // -- EVOLVED-SPITTER card (EliteHumanoid skull MODEL + normalized EliteSpitter organ MODEL) --
-            if (eliteHumanoid != null && eliteSpitterWeapon != null && spitterWeapon != null)
+            // -- EVOLVED-SPITTER card (clone the EVOLVED spit WEAPON as the head-slot occupant) --------
+            // The EliteSpitter weapon carries the evolved spit-organ SkinData and the head RequiredSlotBind, so
+            // occupying the head slot with its normalized clone renders the evolved organ at base spit stats.
+            // (No separate armored-skull bodypart is paired — the evolved look here is the evolved organ mesh;
+            // the armored skull is a SEPARATE 'Armored' card.) Hand=null = single head occupant, no flat-hand.
+            if (eliteSpitterWeapon != null && spitterWeapon != null)
             {
-                TacticalItemDef evolvedSpitterBody = CloneHeadBodypart(repo,
-                    eliteHumanoid, baseHumanoid, "head:authored:EvolvedSpitter",
-                    "TheTurned_Crabman_Head_Evolved_Spitter_BodyPartDef");
-                WeaponDef normalizedEliteSpit = WeaponVariants.GetOrCreateNormalizedWeapon(repo,
+                TacticalItemDef evolvedSpitterHead = CloneHeadWeapon(repo,
                     eliteSpitterWeapon, spitterWeapon, "head:authored:EvolvedSpitter|weapon",
                     "TheTurned_Crabman_Head_Evolved_Spitter_WeaponDef");
-                if (evolvedSpitterBody != null && normalizedEliteSpit != null)
+                if (evolvedSpitterHead != null)
                 {
-                    HeadSets.Add(new MatchedSet { BodyPart = evolvedSpitterBody, Hand = normalizedEliteSpit, IsRight = false, Token = "Evolved_Spitter" });
+                    HeadSets.Add(new MatchedSet { BodyPart = evolvedSpitterHead, Hand = null, IsRight = false, Token = "Evolved_Spitter" });
                 }
                 else
                 {
@@ -332,7 +336,7 @@ namespace TheTurned.Core
             }
             else
             {
-                TheTurnedMain.LogWarn("[TheTurned] authored heads: EliteHumanoid or EliteSpitter weapon unresolved — Evolved-Spitter card skipped");
+                TheTurnedMain.LogWarn("[TheTurned] authored heads: EliteSpitter or base Spitter weapon unresolved — Evolved-Spitter card skipped");
             }
 
             BuildAuthoredArmVariants(repo);
@@ -388,7 +392,9 @@ namespace TheTurned.Core
             }
         }
 
-        /// <summary>Idempotent clone of a head bodypart def: keep the model source's SkinData, normalize stats to base.</summary>
+        /// <summary>Idempotent clone of a head BODYPART def: keep the model source's SkinData, normalize stats to base.
+        /// Used only by the ARMORED card (a skull-only head, no spit). The Spitter / Evolved-Spitter cards instead
+        /// clone the spit WEAPON as the head-slot occupant via <see cref="CloneHeadWeapon"/>.</summary>
         private static TacticalItemDef CloneHeadBodypart(DefRepository repo, TacticalItemDef modelSource,
             TacticalItemDef baseStats, string guidSeed, string cloneName)
         {
@@ -410,6 +416,31 @@ namespace TheTurned.Core
             // Stats NORMALIZED to base (augment principle: evolved look, ordinary mechanics).
             NormalizeBodypartStats(clone, baseStats);
             GiveOwnVed(repo, clone, modelSource, guidSeed, cloneName);
+            return clone;
+        }
+
+        /// <summary>Idempotent clone of a spit WEAPON as a HEAD-SLOT OCCUPANT (the Spitter / Evolved-Spitter cards).
+        /// ROOT-CAUSE FIX: the native spitter Arthron occupies its head slot with the spit WEAPON itself — the
+        /// visible organ mesh is that weapon's SkinData, attached because the weapon's RequiredSlotBinds target
+        /// Crabman_Head_SlotDef (verified crabman-bodypart-catalog §1, in-game). A head BODYPART provides no spit
+        /// sub-slot, so attaching the spit as a SubAddon never renders. WeaponDef : EquipmentDef : TacticalItemDef
+        /// : ItemDef : AddonDef, so a weapon legally occupies the head slot and carries the organ SkinData.
+        /// We reuse <see cref="WeaponVariants.GetOrCreateNormalizedWeapon"/> (Unity shallow-clone via CreateDef
+        /// copies RequiredSlotBinds + SkinData by reference and normalizes combat stats to the base spit; the
+        /// source weapon is NOT mutated), then give the clone its OWN VED so it lists as a card and RebindNames
+        /// never corrupts the live enemy weapon's VED. Returned typed as TacticalItemDef for MatchedSet.BodyPart.</summary>
+        private static TacticalItemDef CloneHeadWeapon(DefRepository repo, WeaponDef weaponSource,
+            WeaponDef baseStats, string guidSeed, string cloneName)
+        {
+            WeaponDef clone = WeaponVariants.GetOrCreateNormalizedWeapon(repo, weaponSource, baseStats, guidSeed, cloneName);
+            if (clone == null)
+            {
+                TheTurnedMain.LogWarn($"[TheTurned] authored heads: spit-weapon clone failed for '{cloneName}'");
+                return null;
+            }
+            // GetOrCreateNormalizedWeapon inherits the source VED by REFERENCE; give the clone its own so the
+            // card menu has a distinct, rebindable VED (and the live enemy spit weapon's VED stays untouched).
+            GiveOwnVed(repo, clone, weaponSource, guidSeed, cloneName);
             return clone;
         }
 

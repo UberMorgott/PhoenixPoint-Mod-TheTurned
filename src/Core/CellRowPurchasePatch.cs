@@ -1,7 +1,10 @@
+using Base.Core;
 using HarmonyLib;
+using PhoenixPoint.Common.Entities.Addons;
 using PhoenixPoint.Common.Entities.Characters;
 using PhoenixPoint.Common.View.ViewModules;
 using PhoenixPoint.Geoscape.Entities;
+using PhoenixPoint.Geoscape.Levels;
 using PhoenixPoint.Geoscape.View.ViewControllers;
 using PhoenixPoint.Geoscape.View.ViewControllers.Progression;
 using PhoenixPoint.Geoscape.View.ViewModules;
@@ -112,12 +115,6 @@ namespace TheTurned.Core
                     return false; // empty cell — nothing to buy / no popup
                 }
 
-                // CELL 1 — NAV: open the augment/Bionics screen, no purchase.
-                if (ability.name == ArthronCellRow.NavAbilityName)
-                {
-                    OpenBionicsScreen();
-                    return false;
-                }
 
                 // Already learned -> no re-buy. (Re-clicking a learned cell is a no-op even in DEV mode;
                 // recruit a fresh Arthron to retest a cell from scratch.)
@@ -202,21 +199,46 @@ namespace TheTurned.Core
         {
             module.RefreshStatPanel();
             SetAbilityTracksMethod.Invoke(module, null);
-        }
 
-        // Open the augment/Bionics screen via the same public entry the DNA button uses
-        // (EditUnitButtonsController.GoToBionicsScreen, AugmentButtonPatch.cs:154). The controller is active on
-        // the recruit's edit screen while the progression panel is shown.
-        private static void OpenBionicsScreen()
-        {
-            EditUnitButtonsController controller = UnityEngine.Object.FindObjectOfType<EditUnitButtonsController>();
-            if (controller == null)
+            // BUG1 — INSTANT DNA BUTTON: re-evaluating the progression panel does NOT re-run the edit-soldier
+            // context-button visibility, so the DNA button (gated on cell-1-learned in
+            // AugmentButtonVisibilityPatch.SetContextButtonVisibility_Postfix) only appeared after a soldier
+            // re-switch. Force one re-evaluation now: EditUnitButtonsController.RefreshContextButtonVisibility()
+            // re-runs SetContextButtonVisibility(_isAugmentationOn) [G EditUnitButtonsController.cs:259-262],
+            // preserving the current augmentation mode, which fires our postfix and reveals the DNA button the
+            // instant cell 1 is bought. Null-safe (the controller is live while the edit screen is open).
+            var editButtons = UnityEngine.Object.FindObjectOfType<EditUnitButtonsController>();
+            editButtons?.RefreshContextButtonVisibility();
+
+            // INSTANT 3D PREVIEW REFRESH (SYNCHRONOUS augment-style). The edit-soldier 3D model builds DIRECTLY
+            // from GeoCharacter.ArmourItems via UIModuleActorCycle.DisplaySoldier — the augment screen renders crab
+            // parts by calling it synchronously (UIModuleBionics.cs:199:
+            // _actorCycleModule.DisplaySoldier(CurrentCharacter, resetAnimation: false, addWeapon: false)). A direct
+            // synchronous DisplaySoldier here is NOT superseded on a cell buy: CommitStatChanges/RefreshStatPanel/
+            // SetAbilityTracks do not raise StatChanged -> RequestRefreshCharacterData, so no _uiRefreshNeeded fires.
+            // Resolve the actor cycle off the live geoscape view; addWeapon:false to match the augment path.
+            // GeoscapeView.GeoscapeModules is a public field [G GeoscapeView.cs:61]; GeoscapeModulesData.ActorCycleModule
+            // is public [G GeoscapeModulesData.cs:114]; CurrentCharacter is public [G UIModuleActorCycle.cs:172];
+            // DisplaySoldier(GeoCharacter, bool, bool, bool) is public [G UIModuleActorCycle.cs:609].
+            // GeoLevelController.View is a public field [G :101].
+            var view = GameUtl.CurrentLevel()?.GetComponent<GeoLevelController>()?.View;
+            UIModuleActorCycle actorCycle = view?.GeoscapeModules?.ActorCycleModule
+                ?? UnityEngine.Object.FindObjectOfType<UIModuleActorCycle>();
+
+            if (actorCycle != null)
             {
-                TheTurnedMain.LogWarn("[TheTurned] CellNav: EditUnitButtonsController not found — cannot open Bionics screen.");
-                return;
+                GeoCharacter shown = actorCycle.CurrentCharacter;
+                actorCycle.DisplaySoldier(shown, resetAnimation: false, addWeapon: false);
+
+                string name = shown?.GetName() ?? "<null>";
+                string armour = shown?.ArmourItems == null ? "<null>"
+                    : string.Join(", ", shown.ArmourItems.Where(i => i?.ItemDef != null).Select(i => i.ItemDef.name));
+                TheTurnedMain.LogInfo($"[TheTurned] CellRefresh: DisplaySoldier sync (char={name}, armour=[{armour}])");
             }
-            TheTurnedMain.LogInfo("[TheTurned] CellNav: cell-1 clicked — opening Bionics/augment screen.");
-            controller.GoToBionicsScreen();
+            else
+            {
+                TheTurnedMain.LogInfo("[TheTurned] CellRefresh: UIModuleActorCycle not found — preview not refreshed.");
+            }
         }
     }
 }

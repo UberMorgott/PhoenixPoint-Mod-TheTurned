@@ -3,7 +3,9 @@ using PhoenixPoint.Common.View.ViewControllers;
 using PhoenixPoint.Common.View.ViewModules;
 using PhoenixPoint.Geoscape.Entities;
 using System;
+using System.Linq;
 using System.Reflection;
+using TheTurned.Monsters.Arthron;
 using UnityEngine;
 
 namespace TheTurned.Core
@@ -64,14 +66,21 @@ namespace TheTurned.Core
                     SetNativeButtonVisible(__instance.MutationButton, false);
                     SetNativeButtonVisible(__instance.BionicsButton, false);
                 }
-                // Show DNA only for the recruit; hide it otherwise (humans untouched beyond their own button).
-                // The DNA button now lives in its OWN cloned wrapper (clone of the bionics wrapper) inside the
-                // augment cluster. Toggle THAT wrapper — it is our object, so this never touches a shared
-                // container; consistent with the native parent-toggle.
+                // Show DNA only for a recruit who has ALREADY bought cell 1 (the NAV marker) — that purchase is
+                // what unlocks the augment tree, so the DNA button must not appear before it. Match the NAV def
+                // by name in the character's learned abilities (same lookup the cell buy-path uses). Hide it for
+                // everyone else (humans untouched beyond their own button). The DNA button lives in its OWN
+                // cloned wrapper (clone of the bionics wrapper) inside the augment cluster. Toggle THAT wrapper —
+                // it is our object, so this never touches a shared container; consistent with the native
+                // parent-toggle. AddAbility re-runs RefreshPanel -> panel rebuild -> this postfix, so the button
+                // appears the instant cell 1 is bought (no screen re-entry).
+                bool cell1Learned = isRecruit && current.Progression != null
+                    && current.Progression.Abilities != null
+                    && current.Progression.Abilities.Any(a => a != null && a.name == ArthronCellRow.NavAbilityName);
                 GameObject dnaWrapper = AugmentButtonPatch.FindDnaWrapper(__instance);
                 if (dnaWrapper != null)
                 {
-                    dnaWrapper.SetActive(isRecruit);
+                    dnaWrapper.SetActive(cell1Learned);
                 }
             }
             catch (Exception e)

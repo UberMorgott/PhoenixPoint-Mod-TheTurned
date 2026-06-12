@@ -105,6 +105,13 @@ namespace TheTurned
             // CellRowPurchasePatch instead of being swallowed) and show an SP (not Mutagen) hover tooltip.
             CellRowInteractivityPatch.Apply((Harmony)HarmonyInstance);
 
+            // ROOT-CAUSE fix: the edit-soldier screen's UpdateSoldierEquipment re-pushes the stale UI human
+            // ArmorList onto the GeoCharacter every refresh, reverting the cell armor / augment arms the mod
+            // wrote to the model. This Postfix re-asserts the recruit's learned arm sets + cell armor AFTER that
+            // re-push, making the mod the last writer each frame. Recruit-scoped + idempotent (no-op when nothing
+            // changed, so no per-frame SetItems churn).
+            EquipReapplyPatch.Apply((Harmony)HarmonyInstance);
+
             // Attach the hotkey poller to the mod's live GameObject (persists for mod lifetime).
             GameObject go = ModGO;
             if (go != null)
