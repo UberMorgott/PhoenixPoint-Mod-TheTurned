@@ -49,7 +49,7 @@ namespace TheTurned.Monsters.Arthron
             // tokens for cells 2/3 swapped vs the old order so the visual ladder matches the user-confirmed meshes.)
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:ARMOR1",
                 "TheTurned_Arthron_Cell_ARMOR1_AbilityDef", "ARTHRON_CELL_ARMOR1",
-                "Arthron_NaturalArmour.png", mutagenCost: 20, extraStats: null,
+                "Arthron_NaturalArmour.png", mutagenCost: 20, extraStats: ArthronEvolution.Cell2Stats(),
                 register: m => CellArmorMarkers.Register(m,
                     new[] { "Crabman_Legs_EliteAgile_ItemDef", "Crabman_Carapace_BodyPartDef" }, order: 2));
 
@@ -66,7 +66,7 @@ namespace TheTurned.Monsters.Arthron
             // chosen weapons (left arm + right arm + head spit) to their elite variants at L4. Prereq cell 2.
             Phase4RowCells.AddMarkerCell(repo, cells, "cell:ARMOR2",
                 "TheTurned_Arthron_Cell_ARMOR2_AbilityDef", "ARTHRON_CELL_ARMOR2",
-                "Arthron_ApexCarapace.png", mutagenCost: 25, extraStats: null,
+                "Arthron_ApexCarapace.png", mutagenCost: 25, extraStats: ArthronEvolution.Cell4Stats(),
                 register: m =>
                 {
                     CellArmorMarkers.Register(m,

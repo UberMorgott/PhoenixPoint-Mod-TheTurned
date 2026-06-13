@@ -120,7 +120,25 @@ namespace TheTurned.Monsters.Arthron
 
         public override void ApplyStatOverrides(TacCharacterDef clone)
         {
-            // No stat overrides — clone keeps pure vanilla Arthron stats (Str 100 -> ~1120 HP).
+            // LOCKED STAT SPEC (docs/STAT-SPEC.md). The recruit's L1 baseline is set on the clone's per-def
+            // authoring fields; per-level growth (L2-L5) is added by the evolution cells' Endurance/Willpower/
+            // Speed stat passives (ArthronEvolution.Cell*Stats), one cell per level (cell N gated to level N).
+            //
+            // HP formula (grounded): MaxHP = Toughness + Endurance x EnduranceToHealthMultiplier.
+            //   EnduranceToHealthMultiplier = 10 [G TacticalActorBaseDef.cs:23]; Arthron Toughness = 120
+            //   (both on the SHARED base def -> NOT touched). TacCharacterData.BonusStats.Endurance = Strength
+            //   [G TacCharacterData.cs:61-63], so the per-def "Strength" field seeds the runtime Endurance stat.
+            //   L1: 120 + 3 x 10 = 150 HP. (Cells then drive 220/300/370/440 at L2/L3/L4/L5.)
+            //
+            // NOTE (reported): base Strength=3 is forced by the locked L1=150 HP + fixed Toughness 120 + x10.
+            //   Strength also seeds carry-weight (EnduranceToCarryWeightMultiplier) -> low carry capacity by design.
+            if (clone?.Data == null)
+            {
+                return;
+            }
+            clone.Data.Strength = 3;   // -> Endurance 3 -> 150 MaxHP at L1
+            clone.Data.Will = 12;
+            clone.Data.Speed = 18;
         }
 
         /// <summary>

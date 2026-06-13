@@ -312,6 +312,14 @@ namespace TheTurned.Core
                 armoredSource, baseHumanoid, "head:authored:Armored", "TheTurned_Crabman_Head_Armored_BodyPartDef");
             if (armoredBody != null)
             {
+                // TANK IDENTITY (LOCKED SPEC, docs/STAT-SPEC.md): the Armored head is the ONE augment part that
+                // is NOT base-normalized — it is a very-hard-to-destroy, very-high-armor skull that cannot
+                // spit/attack (Hand == null). Override the just-normalized stats with the tank values. This is
+                // a CLONE def (TheTurned_Crabman_Head_Armored_BodyPartDef), so the real enemy head is untouched.
+                // NOTE (reported): one clone def = ONE stat pair; the spec's L5 bump (HP 120/Armor 50) cannot be
+                // expressed on this single static def -> shipped at the until-L4 value HP 100 / Armor 40.
+                armoredBody.HitPoints = 100f;
+                armoredBody.Armor = 40f;
                 HeadSets.Add(new MatchedSet { BodyPart = armoredBody, Hand = null, IsRight = false, Token = "Armored" });
             }
 
