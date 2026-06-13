@@ -26,6 +26,14 @@ namespace TheTurned.Core
         private static readonly FieldInfo ParentModuleField =
             AccessTools.Field(typeof(EditUnitButtonsController), "_parentModule");
 
+        // TFTV-added loadout buttons. NOT in our stale decompile (confirmed present in the live assembly via
+        // TFTV src Loadouts.cs:279-280: __instance.ToggleLoadoutButton / .SaveLoadoutButton). Resolve by name
+        // via reflection so the build never depends on the decompiled signature; null-safe if absent.
+        private static readonly FieldInfo ToggleLoadoutButtonField =
+            AccessTools.Field(typeof(EditUnitButtonsController), "ToggleLoadoutButton");
+        private static readonly FieldInfo SaveLoadoutButtonField =
+            AccessTools.Field(typeof(EditUnitButtonsController), "SaveLoadoutButton");
+
         internal static void Apply(Harmony harmony)
         {
             if (_applied || harmony == null)
@@ -65,6 +73,13 @@ namespace TheTurned.Core
                     // private SetCircularButtonVisibility body (parent.gameObject.SetActive) is correct here.
                     SetNativeButtonVisible(__instance.MutationButton, false);
                     SetNativeButtonVisible(__instance.BionicsButton, false);
+                    // Hide the TFTV STRIP-ALL (ToggleLoadoutButton) + SAVE-LOADOUT (SaveLoadoutButton) buttons
+                    // for the recruit. Strip-all empties the armour list, which deletes the crab bodyparts and
+                    // NREs on rebuild — hiding it removes that crash. Reflection (fields not in the decompile);
+                    // null-safe. This method postfixes SetContextButtonVisibility, which runs after the native
+                    // SetEditUnitButtonsBasedOnType pass and is NOT re-shown by TFTV's later helmet postfix.
+                    SetNativeButtonVisible(ToggleLoadoutButtonField?.GetValue(__instance) as PhoenixGeneralButton, false);
+                    SetNativeButtonVisible(SaveLoadoutButtonField?.GetValue(__instance) as PhoenixGeneralButton, false);
                 }
                 // Show DNA only for a recruit who has ALREADY bought cell 1 (the NAV marker) — that purchase is
                 // what unlocks the augment tree, so the DNA button must not appear before it. Match the NAV def

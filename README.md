@@ -1,6 +1,6 @@
 # The Turned
 
-> A modular, monster-agnostic framework for recruiting **turned Pandorans** into your Phoenix Point roster as playable soldiers. Ships one monster today — the **Arthron** (internal codename *Crabman*) — with a soldier-style "cell progression" evolution track. A developer/test build for Phoenix Point, built on **TFTV**. Version **0.3.0**.
+> A modular, monster-agnostic framework for recruiting **turned Pandorans** into your Phoenix Point roster as playable soldiers. Ships one monster today — the **Arthron** (internal codename *Crabman*) — with a soldier-style "cell progression" evolution track. A developer/test build for Phoenix Point, built on **TFTV**. Version **0.3.2**.
 
 The Turned is, first and foremost, an **engine**. A generic `Core` layer does all the heavy lifting — clone an enemy def at runtime, classify it as a real **soldier**, give it a working progression — while each monster lives in its own folder under `src\Monsters\` and supplies only its monster-specific data through one interface (`ITurnedMonster`). Adding a new recruitable Pandoran is a **new folder + one line** in `MonsterRegistry.RegisterDefaults()`; no `Core` changes.
 
@@ -8,7 +8,8 @@ Today the framework registers **exactly one** monster: the **Arthron** (Crabman)
 
 ## Features
 
-- **Modular recruit framework.** A monster-agnostic `Core` (clone → soldier-classify → real progression → faction-reward grant) plus per-monster defs. New monsters need no `Core` changes.
+- **Modular recruit framework.** A monster-agnostic `Core` (clone → soldier-classify → real progression → faction-reward grant) plus per-monster defs. New monsters need no `Core` changes. **Arthron is just the first / example monster** plugged into it.
+- **One shared recruit marker.** Every turned recruit is stamped with a single `GameTag` — `"TheTurned_RecruitTag"` (`Tags.RecruitMarkerTag`) — and **all** mod behavior gates on it: soldier classification, evolution cells, augment screen, and the UI guards. Read geoscape-side via `Phase4.IsPhase4Recruit(GeoCharacter)` and tactical-side via `TacticalActorBase.GameTags.Contains(marker)`. The shared enemy def is never touched, so wild monsters are unaffected.
 - **Arthron as a soldier class.** The recruited Arthron is classified as a playable soldier (not a vehicle), filed under the Soldiers list with its own class.
 - **Cell-progression evolution.** A soldier-style evolution track replaces the old static perk tree: a 5-cell top evolution row that unlocks by character level (earned via mission XP) and is purchased with SkillPoints, with prerequisites and respec.
 - **Visible armor evolution.** Armor cells swap **real Crabman bodypart defs** (legs / torso shell / carapace back-plate) for a visible "armored" read on the model.
@@ -56,7 +57,8 @@ Done:
 
 Planned:
 
-- [ ] More recruitable monsters on the framework (e.g. a Siren-class Pandoran)
+- [ ] More recruitable monsters on the framework (e.g. a Siren- or Triton-class Pandoran) — Arthron is the first of many
+- [ ] **Data-only monsters:** an external per-monster JSON config (`src\Core\MonsterConfig.cs` draft, currently deferred/unwired/excluded from the build) so a new monster is added by data alone, no compile
 - [ ] Real (non-hotkey) spawn / unlock conditions (mission reward / capture-and-turn / research gate)
 - [ ] The bottom **Mutagen** evolution row (designed, deferred)
 - [ ] Final perk / cell icons and art (placeholders today; loader is wired)
@@ -119,7 +121,7 @@ The Turned © 2026 Morgott. Licensed under [CC BY-NC 4.0](https://creativecommon
 
 ## Русский
 
-> Модульный, не привязанный к конкретному монстру фреймворк для найма **обращённых пандоранцев** в ваш ростер Phoenix Point как играбельных бойцов. Сегодня поставляется один монстр — **Артрон** (внутренний кодовый код *Crabman*) — с прогрессией бойца в стиле «клеточной эволюции». Девелоперская/тестовая сборка для Phoenix Point, построенная на **TFTV**. Версия **0.3.0**.
+> Модульный, не привязанный к конкретному монстру фреймворк для найма **обращённых пандоранцев** в ваш ростер Phoenix Point как играбельных бойцов. Сегодня поставляется один монстр — **Артрон** (внутренний кодовый код *Crabman*) — с прогрессией бойца в стиле «клеточной эволюции». Девелоперская/тестовая сборка для Phoenix Point, построенная на **TFTV**. Версия **0.3.2**.
 
 The Turned — это прежде всего **движок**. Универсальный слой `Core` делает всю основную работу — клонирует деф врага во время игры, классифицирует его как настоящего **бойца**, выдаёт ему рабочую прогрессию — тогда как каждый монстр живёт в своей папке под `src\Monsters\` и поставляет лишь свои специфичные данные через один интерфейс (`ITurnedMonster`). Добавить нового наёмного пандоранца — это **новая папка + одна строка** в `MonsterRegistry.RegisterDefaults()`; без изменений `Core`.
 
@@ -127,7 +129,8 @@ The Turned — это прежде всего **движок**. Универса
 
 ### Возможности
 
-- **Модульный фреймворк найма.** Не привязанный к монстру `Core` (клон → классификация как боец → настоящая прогрессия → выдача через награду фракции) плюс дефы по монстрам. Новые монстры не требуют изменений `Core`.
+- **Модульный фреймворк найма.** Не привязанный к монстру `Core` (клон → классификация как боец → настоящая прогрессия → выдача через награду фракции) плюс дефы по монстрам. Новые монстры не требуют изменений `Core`. **Артрон — лишь первый / пример монстра**, подключённого к фреймворку.
+- **Один общий маркер рекрута.** Каждый обращённый рекрут помечается единственным `GameTag` — `"TheTurned_RecruitTag"` (`Tags.RecruitMarkerTag`) — и **всё** поведение мода завязано на него: классификация как боец, клетки эволюции, экран аугментаций, UI-гварды. Читается на геоскейпе через `Phase4.IsPhase4Recruit(GeoCharacter)`, в тактике — через `TacticalActorBase.GameTags.Contains(marker)`. Общий деф врага не трогается, поэтому дикие монстры не затронуты.
 - **Артрон как класс бойца.** Нанятый Артрон классифицируется как играбельный боец (а не техника), попадает в список бойцов со своим классом.
 - **Клеточная эволюция-прогрессия.** Прогрессия в стиле бойца заменяет старое статичное древо перков: верхний ряд эволюции из 5 клеток, открывающихся по уровню персонажа (зарабатывается опытом за миссии) и покупаемых за очки навыка, с предусловиями и переспеком.
 - **Видимая эволюция брони.** Клетки брони подменяют **настоящие дефы частей тела Crabman** (ноги / панцирь торса / задняя пластина-карапакс) ради видимого «бронированного» облика модели.
@@ -175,7 +178,8 @@ The Turned — это прежде всего **движок**. Универса
 
 В планах:
 
-- [ ] Больше наёмных монстров на фреймворке (напр. класс Сирены)
+- [ ] Больше наёмных монстров на фреймворке (напр. класс Сирены или Тритона) — Артрон первый из многих
+- [ ] **Монстры только данными:** внешний JSON-конфиг по монстру (`src\Core\MonsterConfig.cs` черновик, сейчас отложен / не подключён / исключён из сборки), чтобы добавить монстра одними данными, без компиляции
 - [ ] Настоящие (не по горячей клавише) условия появления / открытия (награда за миссию / захват-и-обращение / гейт по исследованию)
 - [ ] Нижний ряд эволюции **Мутаген** (спроектирован, отложен)
 - [ ] Финальные иконки перков / клеток и арт (сейчас заглушки; загрузчик подключён)

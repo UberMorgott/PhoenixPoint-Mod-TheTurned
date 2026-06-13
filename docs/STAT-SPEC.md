@@ -1,5 +1,8 @@
 # TheTurned — Arthron Stat Spec (LOCKED, single source of truth)
 
+> **Scope: the EXAMPLE monster.** TheTurned is a generic recruit framework; these numbers are
+> Arthron-specific DATA, not framework rules. A future monster ships its own spec — the `Core`
+> machinery (cells, marker gating, stat-passive plumbing) is identical.
 > User-approved, wiki-derived stat rework. Numbers are LOCKED — do not re-derive; implement exactly.
 > Date: 2026-06-13. Tier mapping: **L1-L2 = Basic, L3 = Alpha, L4 = Alpha+evolve (limbs flip
 > normal->evolved), L5 = Prime.** Cells gate one-per-level (cell N at level N,

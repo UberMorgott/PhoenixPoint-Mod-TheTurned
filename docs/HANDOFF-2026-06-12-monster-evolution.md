@@ -24,6 +24,15 @@ Dev-only diagnostics still present (remove at cleanup): `CellDevDump`; `Ctrl+Shi
 
 Remaining scope unchanged: §3 Track-2 EP-gated card availability, card→function simplification, real-stat pass (§4–§6).
 
+### Also RESOLVED 2026-06-13 — mission-deploy hang + edit-screen UI cleanup (v0.3.2)
+
+All recruit-scoped via the shared marker (`Tags.RecruitMarkerTag` / `Phase4.IsPhase4Recruit` geo, `TacticalActorBase.GameTags.Contains(marker)` tactical); shared Crabman def untouched. Full detail in `DEVELOPMENT.md` → "2026-06-13 — mission-deploy hang + edit-screen UI cleanup" and `CHANGELOG.md` [0.3.2].
+
+- **Voice-tag hang (tactical):** human-path recruit carries a baked exclusive `VoiceProfileTagDef`; engine `TacticalActorRandomTags.OnActorEnteredPlay` (`TacticalActorRandomTags.cs:17-34`) rolls a 2nd voice tag → `GameTagsList.AddImpl` (`GameTagsList.cs:105-128`, `ErrorOnExistingExclusive`) throws → `TacticalLevelController.OnLevelStart` coroutine dies → ~80% load hang. FIX = `src\Core\RandomTagsExclusiveGuard.cs` recruit-scoped Harmony Prefix, re-rolls mutual-exclusion-safe (skip a rolled tag whose runtime `Type` already on the actor).
+- **Edit-screen UI removals (4, recruit-gated; root = `HumanClassificationPatch` forcing `CheckIsHuman==true` → full human screen + Fatigue):** Fatigue widget (`RecruitFatiguePatch` skips `AddFaitgue` → null Fatigue → `UIModuleCharacterProgression.cs:574/593` auto-hide); hide-helmet controls (`RecruitHelmetTogglePatch` hides native `UIModuleSoldierCustomization.HideHelmetToggle:26` + TFTV `Loadouts.HelmetToggle` TFTV `Loadouts.cs:33`); strip-all (`EditUnitButtonsController.ToggleLoadoutButton`, TFTV `Loadouts.cs:279` — also fixes a strip→empty-armour→NRE crash) + save-loadout (`SaveLoadoutButton`, TFTV `Loadouts.cs:280`), both hidden by extending `src\Core\AugmentButtonVisibilityPatch.cs`.
+
+Dev/planned note: `src\Core\MonsterConfig.cs` (per-monster JSON, data-only new monsters) drafted but DEFERRED — untracked/unwired/excluded from build.
+
 ---
 
 ## 1. CURRENT VERIFIED STATE (done + in-game OK unless noted)

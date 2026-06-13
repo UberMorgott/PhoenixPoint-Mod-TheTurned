@@ -49,6 +49,18 @@ namespace TheTurned
             // Apply the shared marker-scoped CheckIsHuman Postfix. Idempotent (guarded inside Apply).
             HumanClassificationPatch.Apply((Harmony)HarmonyInstance);
 
+            // CRITICAL mission-deploy hang fix: the recruit is generated down the human path so it carries a
+            // baked (mutually-exclusive) VoiceProfileTag; TacticalActorRandomTags.OnActorEnteredPlay then rolls
+            // a second one and GameTags.Add throws -> OnLevelStart coroutine dies -> loading hangs. This
+            // recruit-scoped Prefix makes the random-tag roll mutual-exclusion-safe. Idempotent + marker-gated.
+            RandomTagsExclusiveGuard.Apply((Harmony)HarmonyInstance);
+
+            // UI removals for the recruit (all marker/recruit-gated, idempotent):
+            //  - Stamina/Fatigue mechanic + its slider (skip AddFaitgue for the recruit).
+            //  - Both hide-helmet controls (native Toggle + TFTV custom button) that pop the crab head out.
+            RecruitFatiguePatch.Apply((Harmony)HarmonyInstance);
+            RecruitHelmetTogglePatch.Apply((Harmony)HarmonyInstance);
+
             // Frozen-idle fix: the CheckIsHuman flip makes UnitDisplayData assign the HUMAN anim-actions to
             // the crab rig; this marker-scoped UnitDisplayData ctor Postfix restores the crab's native
             // anim-actions for the recruit only. Idempotent (guarded inside Apply).

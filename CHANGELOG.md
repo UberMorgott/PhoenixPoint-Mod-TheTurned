@@ -2,6 +2,21 @@
 
 All notable changes to **The Turned** are documented here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/); this project uses [Semantic Versioning](https://semver.org/).
 
+## [0.3.2] - 2026-06-13
+
+Mission-deploy hang fix + recruit edit-screen UI cleanup. All recruit-gated on the shared marker tag (`"TheTurned_RecruitTag"`, `Tags.RecruitMarkerTag`) via `Phase4.IsPhase4Recruit` (geo) / the tactical-actor marker (tactical); the shared Crabman/enemy defs are never mutated.
+
+### Fixed
+
+- **Mission-deploy hang (~80% loading) — duplicate-voice-tag crash.** The recruit is generated down the human `CharacterGenerator` path, so it carries a baked, mutually-exclusive `VoiceProfileTagDef`. The engine's `TacticalActorRandomTags.OnActorEnteredPlay` (decompile `TacticalActorRandomTags.cs:17-34`) then rolls a SECOND voice tag, and `GameTagsList.AddImpl` (`GameTagsList.cs:105-128`, `ErrorOnExistingExclusive`) throws `InvalidOperationException` → the `TacticalLevelController.OnLevelStart` coroutine dies → loading screen hangs at ~80%. FIX = `src\Core\RandomTagsExclusiveGuard.cs`: a recruit-scoped Harmony **Prefix** that re-rolls mutual-exclusion-safe (skips adding a rolled tag whose runtime `Type` already exists on the actor), gated on the tactical-actor marker tag. Marker-scoped, hardens against any pre-baked exclusive tag, never touches the shared Crabman def.
+
+### Changed
+
+- **Recruit edit-screen UI cleanup (4 removals, all recruit-gated).** Root cause: `HumanClassificationPatch` forces `CheckIsHuman == true`, so the recruit gets the full human edit screen plus the Fatigue mechanic — neither fits a turned monster. Removed:
+  - **Stamina / Fatigue widget + mechanic.** `src\Core\RecruitFatiguePatch.cs` Prefix-skips `GeoCharacter.AddFaitgue` (vanilla typo) for the recruit → `Fatigue` stays null → `UIModuleCharacterProgression.cs:574/593` auto-hides `StaminaSlider` / `StaminaStatText`.
+  - **Hide-helmet controls** (which would pop the crab head out). `src\Core\RecruitHelmetTogglePatch.cs` hides BOTH the native `UIModuleSoldierCustomization.HideHelmetToggle` (`:26`; via `OnNewCharacter` `:74` Postfix) AND the TFTV custom `Loadouts.HelmetToggle` (TFTV `Loadouts.cs:33`; via `UIModuleActorCycle.SetContextButtonsBasedOnType` Postfix ordered `HarmonyAfter("phoenixrising.tftv")`, reflection).
+  - **Strip-all loadout button** (`EditUnitButtonsController.ToggleLoadoutButton`, TFTV-added, TFTV `Loadouts.cs:279`) and **Save-loadout button** (`EditUnitButtonsController.SaveLoadoutButton`, TFTV `Loadouts.cs:280`): hidden for the recruit by extending `src\Core\AugmentButtonVisibilityPatch.cs` (its `SetContextButtonVisibility` postfix), reflection. Hiding strip-all also removes a crash (strip empties armour → crab bodyparts deleted → NRE).
+
 ## [0.3.1] - 2026-06-13
 
 Phase 4 bug-fix round: the 5-level monster-evolution track is now in-game verified. All fixes built 0-warn, deployed, and live-tested.

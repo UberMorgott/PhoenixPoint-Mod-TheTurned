@@ -74,6 +74,11 @@
   <ItemGroup>
     <!-- Core + per-monster architecture under src/ (recursive). -->
     <Compile Include="src\**\*.cs" />
+    <!-- DEFERRED: the external per-monster JSON config draft (src\Core\MonsterConfig.cs) is NOT part of the
+         build yet — it pulls in Newtonsoft.Json and is unwired pending the config-system pass. Excluded so the
+         draft can stay in the tree without breaking the build. Re-include (and add the Newtonsoft reference)
+         when the config system is resumed. -->
+    <Compile Remove="src\Core\MonsterConfig.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
