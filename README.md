@@ -1,3 +1,5 @@
+> ## ⚠️ WORK IN PROGRESS — NOT READY FOR USE
+
 # The Turned
 
 > A modular, monster-agnostic framework for recruiting **turned Pandorans** into your Phoenix Point roster as playable soldiers. Ships one monster today — the **Arthron** (internal codename *Crabman*) — with a soldier-style "cell progression" evolution track. A developer/test build for Phoenix Point, built on **TFTV**. Version **0.3.2**.
